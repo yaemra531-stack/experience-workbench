@@ -549,7 +549,7 @@ const modalOpen = () => !!$('#modalRoot').innerHTML;
 function openCapture(prefill = '') {
   const m = openModal(`
     <h3>记一下</h3>
-    <div class="sub">把想法、聊天片段或摘录直接粘贴进来。先存进收件箱，有空再整理。</div>
+    <div class="sub">把想法、聊天片段或摘录直接粘贴进来。已有「标题、为什么这样认为、以后怎么做」时，可直接识别并填写。</div>
     <textarea class="capture" id="cText" placeholder="刚刚想到……">${esc(prefill)}</textarea>
     <div class="row">
       <div class="seg" id="cType">${TYPES.map((t, i) => `<button class="${t} ${i === 0 ? 'on' : ''}" data-type="${t}">${t}</button>`).join('')}</div>
@@ -559,6 +559,7 @@ function openCapture(prefill = '') {
     <div class="sims" id="cSims"></div>
     <div class="actions">
       <span style="font-size:12px;color:var(--ink-3)">Ctrl/⌘ + Enter 存入收件箱</span><span class="spacer"></span>
+      <button class="btn" id="cParse">识别格式并填写</button>
       <button class="btn" id="cOrganize">存下并马上整理</button>
       <button class="btn primary" id="cSave">存入收件箱</button>
     </div>`, {
@@ -588,6 +589,25 @@ function openCapture(prefill = '') {
       else { if (S.view === 'inbox' || S.view === 'all') S.selectedId = e.id; renderAll(); toast('已存入收件箱'); }
     } catch (err) { toast('保存失败：' + err.message, true); }
   };
+  $('#cParse', m).addEventListener('click', async () => {
+    const raw = ta.value.trim();
+    if (!raw) { toast('先粘贴要识别的内容', true); return; }
+    if (S.editing) { toast('请先保存或取消正在编辑的经验', true); return; }
+    try {
+      const parsed = await api('POST', '/api/parse', { files: [{ filename: '粘贴的内容.md', text: raw }] });
+      const entries = parsed.files.flatMap(f => f.entries);
+      if (entries.length !== 1 || !entries[0].structured || !entries[0].conclusion) {
+        toast('未识别到一条带标题的经验，请检查格式；原文仍保留在这里', true); return;
+      }
+      const e = entries[0];
+      const tags = $('#cTags', m).value.split(/[,，、\s]+/).map(x => x.trim()).filter(Boolean);
+      const source = $('#cSource', m).value;
+      ta.dataset.saved = '1'; closeModal();
+      S.editing = { id: null, focus: null, draft: { type, conclusion: e.conclusion, why: e.why, how: e.how, raw, tags, source } };
+      renderDetail(); saveDraft();
+      toast('已识别，请检查后保存');
+    } catch (err) { toast('识别失败：' + err.message, true); }
+  });
   $('#cSave', m).addEventListener('click', () => save(false));
   $('#cOrganize', m).addEventListener('click', () => save(true));
   ta.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && (ev.metaKey || ev.ctrlKey)) { ev.preventDefault(); save(false); } });
