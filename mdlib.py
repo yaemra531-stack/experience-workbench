@@ -119,6 +119,7 @@ def match_field_label(line):
     raw = line.strip()
     is_heading = bool(re.match(r"^#{1,6}\s", raw))
     s = _strip_md_prefix(raw)
+    s = re.sub(r"^(?:\d+[.、]|[（(]\d+[）)])\s*", "", s)
     bolded = False
     m = re.match(r"^(\*\*|__)(.+?)(\*\*|__)\s*(.*)$", s)
     if m:
@@ -144,6 +145,8 @@ def match_field_label(line):
                 content = (inline + (" " if inline and rest else "") + rest).strip()
                 return field, content
         else:
+            if tail.strip() in ("？", "?"):
+                return field, ""
             m2 = re.match(r"^[？?]?\s*[：:]\s*(.*)$", tail)
             if m2:
                 return field, m2.group(1).strip()

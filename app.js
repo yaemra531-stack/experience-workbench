@@ -426,6 +426,7 @@ function editorHtml() {
     <div class="field"><label>以后怎么做 <span class="hint">写成下次能直接照做的动作</span></label>
       <textarea id="fHow" placeholder="下次遇到类似情况，具体怎么做？">${esc(d.how)}</textarea></div>
     <div class="field"><label>原始记录 <span class="hint">保留原话，不会被改写</span></label>
+      <button type="button" class="btn" id="reparseRaw">从原始记录重新识别</button>
       ${d.raw ? `<div class="raw-helper-tip">点击下面的句子，可插入到上面正在编辑的栏目里</div><div class="raw-helper" id="rawHelper">${sentenceSpans(d.raw)}</div>` : ''}
       <textarea id="fRaw" style="margin-top:8px;${d.raw ? 'min-height:70px' : ''}" placeholder="可粘贴聊天片段、读书摘录或当时的原话">${esc(d.raw)}</textarea></div>
     <div id="editSims"></div>
@@ -477,6 +478,21 @@ function bindEditor() {
     el.dispatchEvent(new Event('input')); el.focus();
     toast(`已插入到「${{ fConclusion: '一句话结论', fWhy: '为什么', fHow: '怎么做' }[target]}」`);
   }));
+  $('#reparseRaw').addEventListener('click', async () => {
+    const raw = d.raw;
+    if (!raw.trim()) { toast('原始记录为空', true); return; }
+    try {
+      const parsed = await api('POST', '/api/parse', { files: [{ filename: '粘贴的内容.md', text: raw }] });
+      const entries = parsed.files.flatMap(f => f.entries);
+      if (entries.length !== 1 || !entries[0].conclusion || !(entries[0].why || entries[0].how)) {
+        toast('未识别到标题和原因或做法，原有内容未改变', true); return;
+      }
+      if (!confirm('将用原始记录重新填写标题、原因和做法，替换这三个栏目目前的内容。原始记录会保留。确定继续吗？')) return;
+      const e = entries[0];
+      Object.assign(d, { conclusion: e.conclusion, why: e.why, how: e.how });
+      saveDraft(); refreshEditorKeep(); toast('已重新识别，请检查后保存');
+    } catch (err) { toast('识别失败：' + err.message, true); }
+  });
   $('#btnSave').addEventListener('click', saveEdit);
   $('#btnCancel').addEventListener('click', cancelEdit);
   updateEditSims();
@@ -596,7 +612,7 @@ function openCapture(prefill = '') {
     try {
       const parsed = await api('POST', '/api/parse', { files: [{ filename: '粘贴的内容.md', text: raw }] });
       const entries = parsed.files.flatMap(f => f.entries);
-      if (entries.length !== 1 || !entries[0].structured || !entries[0].conclusion) {
+      if (entries.length !== 1 || !entries[0].structured || !entries[0].conclusion || !(entries[0].why || entries[0].how)) {
         toast('未识别到一条带标题的经验，请检查格式；原文仍保留在这里', true); return;
       }
       const e = entries[0];
