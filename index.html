@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>个人经验工作台</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23243b53'/><path d='M9 22l5-12 4 8 3-4 3 8' stroke='%23f5c451' stroke-width='2.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app" class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">经</div>
+      <div>
+        <div class="brand-name">经验工作台</div>
+        <div class="brand-sub">记下来 · 想明白 · 用得上</div>
+      </div>
+    </div>
+    <button class="btn-capture" id="btnCapture" title="快捷键 N">＋ 记一下 <kbd>N</kbd></button>
+    <nav class="nav" id="nav"></nav>
+    <div class="side-section">
+      <div class="side-title">标签</div>
+      <div class="tag-cloud" id="tagCloud"></div>
+    </div>
+    <div class="side-bottom">
+      <button class="side-btn" id="btnReview">🎲 随机重温</button>
+      <button class="side-btn" id="btnImport">⤓ 导入 Markdown</button>
+      <button class="side-btn" id="btnExport">⤒ 导出 Markdown</button>
+      <button class="side-btn" id="btnSettings">⚙ 设置与备份</button>
+    </div>
+  </aside>
+
+  <section class="list-pane">
+    <div class="search-bar">
+      <input id="search" type="search" placeholder="搜索结论、原因、做法、原文、标签…   按 / 聚焦" autocomplete="off">
+      <select id="sort" title="排序">
+        <option value="updated">最近修改</option>
+        <option value="created">最近记录</option>
+        <option value="oldest">最早记录</option>
+      </select>
+    </div>
+    <div class="list-head" id="listHead"></div>
+    <div class="list" id="list"></div>
+  </section>
+
+  <main class="detail-pane" id="detail"></main>
+</div>
+
+<div class="modal-root" id="modalRoot"></div>
+<div class="toast-root" id="toastRoot"></div>
+<script src="vendor/pyodide/pyodide.js"></script>
+<script src="browser-api.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
