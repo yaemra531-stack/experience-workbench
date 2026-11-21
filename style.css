@@ -284,3 +284,24 @@ select.inline { border: 1px solid var(--line); background: var(--panel); border-
 .creative-heading { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .creative-heading h1 { margin: 0; }
 .creative-links button { display: block; width: 100%; text-align: left; margin: 4px 0; }
+/* 创作笔记阅读与编辑 */
+.cw-detail { max-width: 840px; }
+.cw-title { margin: 14px 0 8px; }
+.cw-meta { margin: 6px 0 14px; overflow-wrap: anywhere; }
+.cw-edit { margin-top: 20px; }
+.cw-edit .field { margin: 14px 0; }
+.cw-edit .field > label { display:block; font-weight:600; color:var(--ink-2); margin-bottom:6px; }
+.cw-edit select { padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:var(--panel); }
+.cw-markdown-input { min-height: 54vh !important; font-family:var(--mono); font-size:14px; line-height:1.75; }
+.creative-prose { font-size:15.5px; line-height:1.85; overflow-wrap:anywhere; }
+.creative-prose h1,.creative-prose h2,.creative-prose h3,.creative-prose h4 { color:var(--ink); line-height:1.45; margin:1.6em 0 .7em; }
+.creative-prose h2 { font-size:22px; } .creative-prose h3 { font-size:18px; }
+.creative-prose p { margin:.7em 0; } .creative-prose li { margin:.35em 0; }
+.creative-prose pre { white-space:pre-wrap; background:var(--panel-2); padding:14px; border-radius:8px; overflow:auto; }
+.creative-prose code { font-family:var(--mono); }
+.creative-prose hr { border:0; border-top:1px solid var(--line); margin:24px 0; }
+.cw-table-wrap { overflow-x:auto; margin:16px 0; }
+.creative-prose table { width:100%; border-collapse:collapse; text-align:left; }
+.creative-prose th,.creative-prose td { border-bottom:1px solid var(--line); padding:10px 12px; vertical-align:top; }
+.creative-prose th { background:var(--panel-2); font-weight:650; }
+.creative-prose a { color:var(--accent-2); }
