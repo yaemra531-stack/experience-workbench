@@ -164,8 +164,9 @@
       if(l.includes('|')&&i+1<lines.length&&isSep(lines[i+1])){const heads=tableRow(l);i+=2;let rows='';while(i<lines.length&&lines[i].includes('|')&&lines[i].trim()){const cells=tableRow(lines[i++]);rows+='<tr>'+heads.map((_,n)=>'<td>'+inline(cells[n]||'')+'</td>').join('')+'</tr>';}html+='<div class="cw-table-wrap"><table><thead><tr>'+heads.map(c=>'<th>'+inline(c)+'</th>').join('')+'</tr></thead><tbody>'+rows+'</tbody></table></div>';continue;}
       if((m=l.match(/^(#{1,6})\s+(.*)$/))){const level=Math.min(m[1].length+1,6);html+=`<h${level}>${inline(m[2])}</h${level}>`;i++;continue;}
       if(/^\s*([-*+] |\d+[.)、] )/.test(l)){const ordered=/^\s*\d+[.)、] /.test(l),tag=ordered?'ol':'ul',buf=[];while(i<lines.length&&(ordered?/^\s*\d+[.)、] /:/^\s*[-*+] /).test(lines[i]))buf.push('<li>'+inline(lines[i++].replace(/^\s*(?:[-*+]|\d+[.)、])\s+/,''))+'</li>');html+='<'+tag+'>'+buf.join('')+'</'+tag+'>';continue;}
+      if(/^\s*>\s?/.test(l)){const b=[];while(i<lines.length && /^\s*>\s?/.test(lines[i]))b.push(inline(lines[i++].replace(/^\s*>\s?/,'')));html+='<blockquote>'+b.join('<br>')+'</blockquote>';continue;}
       if(/^\s*[-*_]{3,}\s*$/.test(l)){html+='<hr>';i++;continue;}
-      let buf=[inline(l)];i++;while(i<lines.length&&lines[i].trim()&&!/^(#{1,6}\s|```|\s*[-*+] |\s*\d+[.)、] )/.test(lines[i]) && !(lines[i].includes('|')&&i+1<lines.length&&isSep(lines[i+1])))buf.push(inline(lines[i++]));html+='<p>'+buf.join('<br>')+'</p>';
+      let buf=[inline(l)];i++;while(i<lines.length&&lines[i].trim()&&!/^(#{1,6}\s|```|\s*>|\s*[-*+] |\s*\d+[.)、] )/.test(lines[i]) && !(lines[i].includes('|')&&i+1<lines.length&&isSep(lines[i+1])))buf.push(inline(lines[i++]));html+='<p>'+buf.join('<br>')+'</p>';
     }
     return html;
   }
