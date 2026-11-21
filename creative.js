@@ -42,6 +42,11 @@
 - **值得学：**
 - **暂不模仿：**
 - **当前判断：** 待实践。`;
+  const importFormat = `标题：案例02｜填写案例名称
+参考视频链接：
+状态：待实践
+正文：
+${shortTemplate}`;
   const longTemplate = `## 核心结论
 
 ## 表达步骤
@@ -134,7 +139,7 @@
       const values=[...Object.values(x),structure?.title||'',structure?.steps||''].join(' ').toLowerCase();
       return (!q||values.includes(q)) && (filter==='all'||(mode==='short'?practice(x):'all')===filter);
     }).sort((a,b)=>String(b.updated||b.created).localeCompare(String(a.updated||a.created)));
-    return `<section class="list-pane"><div class="creative-list-actions"><button class="btn primary big" data-action="new">＋ 新建${mode==='short'?'短线':'长线'}</button></div>
+    return `<section class="list-pane"><div class="creative-list-actions"><button class="btn primary big" data-action="new">＋ 新建${mode==='short'?'短线':'长线'}</button>${mode==='short'?'<button class="btn" data-action="pasteCase">📋 粘贴案例</button>':''}</div>
       <div class="creative-search"><input id="creativeSearch" type="search" placeholder="搜索标题、内容、结构、状态…" value="${E(search)}"><select id="creativeFilter" aria-label="按状态筛选"><option value="all">全部状态</option>${mode==='short'?options(statuses,filter):''}</select></div>
       <div class="list-head">${mode==='short'?'短线创作':'长线结构'} · ${items.length} 条</div><div class="list">${items.length?items.slice(0,visibleLimit).map(x=>`<div class="card ${selected===x.id?'selected':''}" data-select="${E(x.id)}"><div class="card-top"><span class="chip ${mode==='short'?'短线':'长线'}">${E(x.code)}</span><span>${E(mode==='short'?practice(x):'结构与方法')}</span><span class="date">${E((x.created||'').slice(0,10))}</span></div><div class="card-title">${E(x.title||x.url||'未命名记录')}</div>${mode==='short'&&x.structureId?`<div class="card-how">结构：${E(db.long.find(y=>y.id===x.structureId)?.title||'未找到')}</div>`:''}</div>`).join('')+(items.length>visibleLimit?`<button class="more" data-action="more">再显示 ${Math.min(100,items.length-visibleLimit)} 条</button>`:''):'<div class="empty-list">还没有符合条件的记录</div>'}</div></section>`;
   }
@@ -175,13 +180,58 @@
     const body=bodyOf(draft,mode), related=mode==='short'?db.long.find(x=>x.id===draft.structureId):null;
     const refs=mode==='long'?`<details class="creative-section"><summary>关联的短线作品（${db.short.filter(x=>x.structureId===draft.id).length}）</summary><div class="creative-links">${db.short.filter(x=>x.structureId===draft.id).map(x=>`<button class="btn" data-goto-short="${E(x.id)}">${E(x.code+'｜'+(x.title||'未命名'))}</button>`).join('')||'<span class="creative-hint">暂无关联作品。</span>'}</div></details>`:'';
     const linkEditor=mode==='short'?`<div class="field"><label>关联长线结构（可选）</label><select data-field="structureId" aria-label="关联长线结构"><option value="">暂不关联</option>${db.long.map(x=>`<option value="${E(x.id)}" ${x.id===draft.structureId?'selected':''}>${E(x.code+'｜'+x.title)}</option>`).join('')}</select></div><button type="button" class="btn" data-action="newLinked">＋ 新建长线结构并关联</button>`:'';
-    const legacy=typeof draft.body==='string' && legacyBody(draft,mode) ? `<details class="creative-section"><summary>查看 V1 原有字段（已保留）</summary><div class="creative-prose">${markdown(legacyBody(draft,mode))}</div></details>` : '';
+    const hasLegacy = groups[mode].some(([, fields]) => fields.some(([k]) => !['title','url'].includes(k) && draft[k] !== undefined && draft[k] !== null && String(draft[k]).trim() !== ''));
+    const legacy=typeof draft.body==='string' && hasLegacy && legacyBody(draft,mode) ? `<details class="creative-section"><summary>查看 V1 原有字段（已保留）</summary><div class="creative-prose">${markdown(legacyBody(draft,mode))}</div></details>` : '';
     const editHtml=`<div class="editor cw-edit"><div class="field"><label>标题</label><input data-field="title" aria-label="标题" value="${E(draft.title||'')}"></div>${mode==='short'?`<div class="field"><label>参考视频链接（可选）</label><input type="url" data-field="url" aria-label="参考视频链接" value="${E(draft.url||'')}"></div><div class="field"><label>状态</label><select data-field="practiceStatus" aria-label="状态">${options(statuses,practice(draft))}</select></div>${linkEditor}`:''}<div class="field"><label>Markdown 正文</label><textarea class="cw-markdown-input" data-field="body" aria-label="Markdown 正文">${E(body)}</textarea></div></div><div class="creative-sticky"><button class="btn primary big" data-action="save">保存</button><button class="btn" data-action="cancelEdit">取消</button><span class="creative-hint">${dirty?'有未保存修改':'编辑中'}</span></div>`;
     const viewHtml=`<div class="detail-toolbar"><button class="btn primary" data-action="edit">编辑</button><button class="btn" data-action="copy">复制 Markdown</button><span class="spacer"></span><button class="btn danger" data-action="delete">删除</button></div><div class="creative-heading"><span class="chip ${mode==='short'?'短线':'长线'}">${E(draft.code)}</span>${mode==='short'?`<span class="chip ghost">${E(practice(draft))}</span>`:''}</div><h1 class="conclusion cw-title">${E(draft.title||'未命名记录')}</h1><div class="creative-hint cw-meta">创建：${E(localTime(draft.created))} · 修改：${E(localTime(draft.updated||draft.created))}</div>${draft.url?`<div class="creative-hint cw-meta">参考链接：${/^https?:\/\//i.test(draft.url)?`<a href="${E(draft.url)}" target="_blank" rel="noopener noreferrer">${E(draft.url)}</a>`:E(draft.url)}</div>`:''}${related?`<div class="creative-hint cw-meta">关联结构：${E(related.code+'｜'+related.title)}</div>`:''}<article class="creative-prose">${markdown(body)}</article>${legacy}${refs}`;
     return `<main class="detail-pane"><div class="detail cw-detail">${editing?`<div class="creative-heading"><span class="chip ${mode==='short'?'短线':'长线'}">${E(draft.code)}</span><span class="creative-hint">${selected?'编辑记录':'新记录'}</span></div>${editHtml}`:viewHtml}</div></main>`;
   }
   function render() { root.innerHTML=sidebar()+records()+detail(); }
   function refreshList() { const pane=$c('.list-pane'), list=pane.querySelector('.list'), scroll=list.scrollTop; const temp=document.createElement('div'); temp.innerHTML=records(); pane.querySelector('.list-head').replaceWith(temp.querySelector('.list-head')); list.replaceWith(temp.querySelector('.list')); pane.querySelector('.list').scrollTop=scroll; }
+  // 只识别正文开头的明确字段；未识别的内容全部保留在正文。
+  function parseCase(text) {
+    const lines=String(text||'').replace(/\r\n?/g,'\n').split('\n');
+    let title='',url='',status='待实践',i=0;const prefix=[];
+    while(i<lines.length) {
+      const line=lines[i], clean=line.trim(); let m;
+      if(!clean){ if(prefix.length)prefix.push('');i++;continue; }
+      if((m=clean.match(/^正文\s*[：:]\s*(.*)$/))){ if(m[1])prefix.push(m[1]);i++;break; }
+      if(/^#{2,6}\s/.test(clean))break;
+      if(!title && (m=clean.match(/^#\s+(.+?)\s*$/))){ title=m[1].trim();i++;continue; }
+      const plain=clean.replace(/^[-*+]\s+/, '').replace(/^\*\*([^*]+?)\*\*\s*([：:]?)/,'$1$2').replace(/^\*\*([^*]+[：:])\*\*/, '$1');
+      if(!title && (m=plain.match(/^(?:标题|案例标题)\s*[：:]\s*(.+)$/))){title=m[1].trim();i++;continue;}
+      if((m=plain.match(/^(?:参考视频链接|视频链接|参考链接)\s*[：:]\s*(.*)$/))){
+        const candidate=m[1].trim();
+        if(!candidate){i++;continue;}
+        if(/^https?:\/\/\S+$/i.test(candidate)){url=candidate;i++;continue;}
+        prefix.push(line);i++;continue;
+      }
+      if((m=plain.match(/^状态\s*[：:]\s*(待实践|已实践)\s*$/))){status=m[1];i++;continue;}
+      if((m=plain.match(/^状态\s*[：:]\s*$/))){i++;continue;}
+      // 来源说明、时长等不是独立字段：原样并入正文。
+      prefix.push(line);i++;
+    }
+    return {title,url,practiceStatus:status,body:[...prefix,...lines.slice(i)].join('\n').trim()};
+  }
+  function openCasePaste(){
+    const m=openModal(`<h3>粘贴案例</h3><div class="sub">把下面的格式发给 AI，或直接粘贴符合此结构的案例。将生成一条新短线，检查后点击保存。</div>
+      <details open><summary>案例格式（可复制给 AI）</summary><pre class="pre-md" id="caseFormat">${E(importFormat)}</pre><div class="row"><button class="btn" id="caseCopyFormat">复制格式</button></div></details>
+      <div class="row"><button class="btn" id="casePasteClipboard">粘贴并识别</button><span class="creative-hint">也可以在下面按 ⌘V / Ctrl+V</span></div>
+      <textarea class="capture" id="casePasteText" aria-label="粘贴完整案例" placeholder="把 AI 整理好的完整案例粘贴在这里" style="margin-top:10px"></textarea>
+      <div id="casePasteError"></div><div class="actions"><button class="btn" id="casePasteCancel">取消</button><button class="btn primary" id="casePasteApply">识别并填写</button></div>`,{wide:true});
+    const input=m.querySelector('#casePasteText'),error=m.querySelector('#casePasteError');
+    m.querySelector('#casePasteCancel').addEventListener('click',closeModal);
+    m.querySelector('#caseCopyFormat').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(importFormat);notice('已复制案例格式，可发给 AI');}catch(_){notice('请手动选中上方格式并复制',true);}});
+    function applyCase(){
+      const value=input.value;if(!value.trim()){notice('请先粘贴案例内容',true);return;}
+      const parsed=parseCase(value);
+      if(!parsed.title || !parsed.body){error.textContent='请填写标题和正文；粘贴内容仍保留在输入框中。';return;}
+      if(!askLeave())return;
+      const next=newDraft('short');Object.assign(next,parsed);draft=next;mode='short';selected=null;editing=true;dirty=true;returnDraft=null;search='';filter='all';visibleLimit=100;closeModal();render();notice('已识别，请检查后保存');
+    }
+    m.querySelector('#casePasteClipboard').addEventListener('click',async()=>{try{const t=await navigator.clipboard.readText();if(!m.isConnected)return;if(!t){notice('剪贴板没有文字，请手动粘贴',true);return;}input.value=t;error.innerHTML='';applyCase();}catch(_){input.focus();notice('请在输入框按 ⌘V / Ctrl+V 粘贴',true);}});
+    m.querySelector('#casePasteApply').addEventListener('click',applyCase);
+  }
   async function copyBody(){
     const value=bodyOf(draft,mode);
     try{await navigator.clipboard.writeText(value);notice('已复制 Markdown');}
@@ -208,7 +258,7 @@
     const r=e.target.closest('[data-select]');if(r){if(!askLeave())return;selected=r.dataset.select;draft=clone(list().find(x=>x.id===selected));editing=false;dirty=false;returnDraft=null;render();return;}
     const go=e.target.closest('[data-goto-short]');if(go){if(!askLeave())return;mode='short';selected=go.dataset.gotoShort;draft=clone(db.short.find(x=>x.id===selected));editing=false;dirty=false;search='';filter='all';render();return;}
     const a=e.target.closest('[data-action]');if(!a)return;
-    switch(a.dataset.action){case 'more':visibleLimit+=100;refreshList();break;case 'experience':if(!askLeave())return;root.hidden=true;old.hidden=false;break;case 'new':beginNew();break;case 'edit':editing=true;dirty=false;render();break;case 'cancelEdit':if(!askLeave())return;if(returnDraft){mode='short';draft=returnDraft;returnDraft=null;selected=db.short.some(x=>x.id===draft.id)?draft.id:null;editing=true;dirty=true;render();return;}if(selected){draft=clone(list().find(x=>x.id===selected));editing=false;dirty=false;}else{draft=null;editing=false;dirty=false;}render();break;case 'copy':copyBody();break;case 'save':save();break;case 'delete':remove();break;case 'newLinked':createLinked();break;case 'backup':download();break;case 'restore':$c('#creativeRestore').click();break;}
+    switch(a.dataset.action){case 'more':visibleLimit+=100;refreshList();break;case 'experience':if(!askLeave())return;root.hidden=true;old.hidden=false;break;case 'new':beginNew();break;case 'pasteCase':openCasePaste();break;case 'edit':editing=true;dirty=false;render();break;case 'cancelEdit':if(!askLeave())return;if(returnDraft){mode='short';draft=returnDraft;returnDraft=null;selected=db.short.some(x=>x.id===draft.id)?draft.id:null;editing=true;dirty=true;render();return;}if(selected){draft=clone(list().find(x=>x.id===selected));editing=false;dirty=false;}else{draft=null;editing=false;dirty=false;}render();break;case 'copy':copyBody();break;case 'save':save();break;case 'delete':remove();break;case 'newLinked':createLinked();break;case 'backup':download();break;case 'restore':$c('#creativeRestore').click();break;}
   });
   window.addEventListener('beforeunload',e=>{if(!root.hidden&&dirty){e.preventDefault();e.returnValue='';}});
 })();
