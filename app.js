@@ -433,6 +433,7 @@ function editorHtml() {
     <div class="editor-actions">
       <button class="btn primary big" id="btnSave">保存 <kbd style="color:inherit;border-color:currentColor;background:transparent">Ctrl/⌘ + Enter</kbd></button>
       <button class="btn big" id="btnCancel">取消</button>
+      <button class="btn big" id="btnPasteStructured">粘贴匹配格式</button>
       <span class="spacer"></span><span class="tip">自动保存草稿，误关也不会丢</span>
     </div>
   </div>`;
@@ -495,6 +496,7 @@ function bindEditor() {
   });
   $('#btnSave').addEventListener('click', saveEdit);
   $('#btnCancel').addEventListener('click', cancelEdit);
+  $('#btnPasteStructured').addEventListener('click', openStructuredPaste);
   updateEditSims();
   const f = S.editing.focus === 'why' ? 'fWhy' : S.editing.focus === 'how' ? 'fHow' : S.editing.focus === 'tag' ? 'fTag' : S.editing.focus === 'conclusion' ? 'fConclusion' : null;
   if (f) { const el = $('#' + f); el.focus(); if (el.setSelectionRange) el.setSelectionRange(el.value.length, el.value.length); lastFocusField = f; }
@@ -560,6 +562,58 @@ function closeModal() {
   root.innerHTML = '';
 }
 const modalOpen = () => !!$('#modalRoot').innerHTML;
+
+// ---------- 编辑已有经验：粘贴结构化内容，预览后覆盖编辑字段
+function openStructuredPaste() {
+  const editing = S.editing;
+  if (!editing) return;
+  const m = openModal(`
+    <h3>粘贴并匹配格式</h3>
+    <div class="sub">把完整修改稿粘贴到下面。识别后先预览，确认才覆盖标题、原因和做法；原始记录保留，最后仍需点「保存」。</div>
+    <details open><summary>查看可用格式</summary><pre class="pre-md">标题：一句话结论
+
+为什么这样认为：
+写下依据、经历或情境。
+
+以后怎么做：
+1. 写下具体行动。
+2. 可以继续分条。</pre><div class="sub" style="margin:8px 0">也支持「1. 为什么这样认为？」等编号标题，以及 Markdown 标题。</div></details>
+    <div class="row"><button class="btn" id="pasteFromClipboard">从剪贴板粘贴</button><span class="sub" style="margin:0">也可点击输入框，按 ⌘V / Ctrl+V</span></div>
+    <textarea id="structuredPasteText" class="capture" aria-label="粘贴完整修改稿" placeholder="在这里粘贴完整修改稿" style="margin-top:10px"></textarea>
+    <div id="structuredPastePreview"></div>
+    <div class="actions"><button class="btn" id="structuredPasteCancel">取消</button><span class="spacer"></span><button class="btn" id="structuredPasteParse">识别并预览</button><button class="btn primary" id="structuredPasteApply" disabled>应用并覆盖</button></div>`, { wide: true });
+  const input = $('#structuredPasteText', m), preview = $('#structuredPastePreview', m), apply = $('#structuredPasteApply', m);
+  let matched = null;
+  const invalidate = () => { matched = null; apply.disabled = true; preview.innerHTML = ''; };
+  input.addEventListener('input', invalidate);
+  $('#structuredPasteCancel', m).addEventListener('click', closeModal);
+  $('#pasteFromClipboard', m).addEventListener('click', async () => {
+    try { const text = await navigator.clipboard.readText(); if (!text) { toast('剪贴板没有文本，请手动粘贴', true); return; } input.value = text; invalidate(); input.focus(); }
+    catch (_) { input.focus(); toast('请在输入框按 ⌘V / Ctrl+V 粘贴', true); }
+  });
+  $('#structuredPasteParse', m).addEventListener('click', async () => {
+    const text = input.value.trim();
+    invalidate();
+    if (!text) { toast('请先粘贴修改稿', true); input.focus(); return; }
+    try {
+      const parsed = await api('POST', '/api/parse', { files: [{ filename: '粘贴的内容.md', text }] });
+      if (S.editing !== editing || !m.isConnected || input.value.trim() !== text) return;
+      const entries = parsed.files.flatMap(f => f.entries);
+      if (entries.length !== 1 || !entries[0].conclusion || !entries[0].why || !entries[0].how) {
+        preview.innerHTML = '<div class="notice" style="margin-top:12px">未完整识别。请按示例填写标题、为什么这样认为和以后怎么做三个栏目，原有内容没有改变。</div>';
+        return;
+      }
+      matched = entries[0];
+      preview.innerHTML = `<div class="sub-title" style="margin-top:14px">识别预览</div><div class="notice" style="display:block"><b>标题：</b>${esc(matched.conclusion)}<br><br><b>为什么这样认为：</b><br>${esc(matched.why).replace(/\n/g, '<br>')}<br><br><b>以后怎么做：</b><br>${esc(matched.how).replace(/\n/g, '<br>')}</div>`;
+      apply.disabled = false;
+    } catch (err) { toast('识别失败：' + err.message, true); }
+  });
+  apply.addEventListener('click', () => {
+    if (!matched || S.editing !== editing) return;
+    Object.assign(editing.draft, { conclusion: matched.conclusion, why: matched.why, how: matched.how });
+    saveDraft(); closeModal(); renderDetail(); toast('已填入，请检查后保存');
+  });
+}
 
 // ---------- 快速记录
 function openCapture(prefill = '') {
