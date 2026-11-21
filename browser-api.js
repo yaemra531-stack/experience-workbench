@@ -6,7 +6,7 @@ let apiQueue = Promise.resolve();
 async function initBrowserRuntime() {
   const py = await loadPyodide();
   for (const name of ['mdlib.py', 'server.py']) {
-    const response = await fetch(name + '?v=20261118-3');
+    const response = await fetch(name + '?v=20261121-2');
     if (!response.ok) throw new Error('无法加载应用文件：' + name);
     py.FS.writeFile(name, await response.text());
   }

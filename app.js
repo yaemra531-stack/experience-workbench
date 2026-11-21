@@ -152,7 +152,7 @@ function inView(e, v) {
 function terms() { return S.q.trim().toLowerCase().split(/\s+/).filter(Boolean); }
 function matchQ(e, ts) {
   if (!ts.length) return true;
-  const hay = [e.conclusion, e.why, e.how, e.raw, (e.tags || []).join(' '), e.source, e.source_file].join('\n').toLowerCase();
+  const hay = [e.conclusion, e.why, e.how, e.raw, e.prompt, (e.tags || []).join(' '), e.source, e.source_file].join('\n').toLowerCase();
   return ts.every((t) => hay.includes(t));
 }
 function filtered() {
@@ -334,6 +334,7 @@ function renderDetail() {
     ${e.status === 'inbox' ? '' : block('why', '为什么这样认为', e.why, 'why', '补充：当时为什么会这样认为？依据或经历是什么？')}
     ${e.status === 'inbox' ? '' : block('how', '以后怎么做', e.how, 'how', '补充：下次遇到类似情况，具体怎么做？')}
     ${e.raw ? `<details class="raw" ${e.status === 'inbox' || !e.conclusion || (ts.length && matchQ({ conclusion: e.raw, tags: [] }, ts)) ? 'open' : ''}><summary>原始记录</summary><div class="block-body">${ts.length ? hlMd(e.raw, ts) : md(e.raw)}</div></details>` : ''}
+    <details class="raw" ${ts.length && e.prompt && matchQ({ conclusion: e.prompt, tags: [] }, ts) ? 'open' : ''}><summary>提示词</summary><div class="block-body">${e.prompt ? (ts.length ? hlMd(e.prompt, ts) : md(e.prompt)) : '<span class="missing" data-fill="prompt">＋ 添加提示词</span>'}${e.prompt && !isTrash ? '<div style="margin-top:10px"><button class="btn" data-act="copyPrompt">复制提示词</button></div>' : ''}</div></details>
     ${simHtml}${histHtml}
   </div>`;
   if (fresh) $('.detail', el).classList.add('rise');
@@ -400,7 +401,7 @@ function startEdit(id, focusField) {
     focus: focusField || (e && !e.conclusion ? 'conclusion' : null),
     draft: {
       type: e?.type || '短线', conclusion: e?.conclusion || '', why: e?.why || '', how: e?.how || '',
-      raw: e?.raw || '', tags: [...(e?.tags || [])], source: e?.source || '聊天',
+      raw: e?.raw || '', prompt: e?.prompt || '', tags: [...(e?.tags || [])], source: e?.source || '聊天',
     },
   };
   renderDetail();
@@ -429,6 +430,7 @@ function editorHtml() {
       <button type="button" class="btn" id="reparseRaw">从原始记录重新识别</button>
       ${d.raw ? `<div class="raw-helper-tip">点击下面的句子，可插入到上面正在编辑的栏目里</div><div class="raw-helper" id="rawHelper">${sentenceSpans(d.raw)}</div>` : ''}
       <textarea id="fRaw" style="margin-top:8px;${d.raw ? 'min-height:70px' : ''}" placeholder="可粘贴聊天片段、读书摘录或当时的原话">${esc(d.raw)}</textarea></div>
+    <details class="raw" ${S.editing.focus === 'prompt' ? 'open' : ''}><summary>提示词</summary><div class="field" style="margin-top:10px"><textarea id="fPrompt" aria-label="提示词" placeholder="把这条经验对应的提示词保存在这里">${esc(d.prompt || '')}</textarea></div></details>
     <div id="editSims"></div>
     <div class="editor-actions">
       <button class="btn primary big" id="btnSave">保存 <kbd style="color:inherit;border-color:currentColor;background:transparent">Ctrl/⌘ + Enter</kbd></button>
@@ -451,7 +453,7 @@ let lastFocusField = 'fConclusion';
 function bindEditor() {
   const d = S.editing.draft;
   const bind = (id, key) => { const el = $('#' + id); el.addEventListener('input', () => { d[key] = el.value; saveDraft(); if (key !== 'raw') updateEditSims(); }); el.addEventListener('focus', () => { lastFocusField = id; }); };
-  bind('fConclusion', 'conclusion'); bind('fWhy', 'why'); bind('fHow', 'how'); bind('fRaw', 'raw');
+  bind('fConclusion', 'conclusion'); bind('fWhy', 'why'); bind('fHow', 'how'); bind('fRaw', 'raw'); bind('fPrompt', 'prompt');
   const cl = () => { const n = d.conclusion.length; $('#cLen').textContent = n ? `${n} 字${n > 50 ? ' · 试试更短一点' : ''}` : ''; };
   $('#fConclusion').addEventListener('input', cl); cl();
   $('#fSource').addEventListener('change', (ev) => { d.source = ev.target.value; saveDraft(); });
@@ -498,7 +500,7 @@ function bindEditor() {
   $('#btnCancel').addEventListener('click', cancelEdit);
   $('#btnPasteStructured').addEventListener('click', openStructuredPaste);
   updateEditSims();
-  const f = S.editing.focus === 'why' ? 'fWhy' : S.editing.focus === 'how' ? 'fHow' : S.editing.focus === 'tag' ? 'fTag' : S.editing.focus === 'conclusion' ? 'fConclusion' : null;
+  const f = S.editing.focus === 'why' ? 'fWhy' : S.editing.focus === 'how' ? 'fHow' : S.editing.focus === 'prompt' ? 'fPrompt' : S.editing.focus === 'tag' ? 'fTag' : S.editing.focus === 'conclusion' ? 'fConclusion' : null;
   if (f) { const el = $('#' + f); el.focus(); if (el.setSelectionRange) el.setSelectionRange(el.value.length, el.value.length); lastFocusField = f; }
   S.editing.focus = null;
 }
@@ -519,7 +521,7 @@ function clearDraft() { try { localStorage.removeItem(DRAFT_KEY); } catch (_) {}
 async function saveEdit() {
   const ed = S.editing; if (!ed) return;
   const d = { ...ed.draft };
-  if (!normalize([d.conclusion, d.why, d.how, d.raw].join(''))) { toast('还什么都没写呢', true); return; }
+  if (!normalize([d.conclusion, d.why, d.how, d.raw, d.prompt].join(''))) { toast('还什么都没写呢', true); return; }
   try {
     let e;
     if (ed.id) {
@@ -541,8 +543,8 @@ function cancelEdit() {
   const ed = S.editing;
   const orig = ed.id ? byId(ed.id) : null;
   const d = ed.draft;
-  const dirty = orig ? ['conclusion', 'why', 'how', 'raw', 'type', 'source'].some((k) => (orig[k] || '') !== (d[k] || '')) || (orig.tags || []).join() !== d.tags.join()
-    : normalize([d.conclusion, d.why, d.how, d.raw].join(''));
+  const dirty = orig ? ['conclusion', 'why', 'how', 'raw', 'prompt', 'type', 'source'].some((k) => (orig[k] || '') !== (d[k] || '')) || (orig.tags || []).join() !== d.tags.join()
+    : normalize([d.conclusion, d.why, d.how, d.raw, d.prompt].join(''));
   if (dirty && !confirm('有未保存的修改，确定放弃吗？')) return;
   S.editing = null; clearDraft(); renderDetail();
 }
@@ -563,13 +565,13 @@ function closeModal() {
 }
 const modalOpen = () => !!$('#modalRoot').innerHTML;
 
-// ---------- 编辑已有经验：粘贴结构化内容，预览后覆盖编辑字段
+// ---------- 编辑经验：粘贴完整修改稿后直接识别并应用
 function openStructuredPaste() {
   const editing = S.editing;
   if (!editing) return;
   const m = openModal(`
     <h3>粘贴并匹配格式</h3>
-    <div class="sub">把完整修改稿粘贴到下面。识别后先预览，确认才覆盖标题、原因和做法；原始记录保留，最后仍需点「保存」。</div>
+    <div class="sub">识别后直接填入标题、原因和做法；原始记录和提示词保留，最后点「保存」。</div>
     <details open><summary>查看可用格式</summary><pre class="pre-md">标题：一句话结论
 
 为什么这样认为：
@@ -580,38 +582,30 @@ function openStructuredPaste() {
 2. 可以继续分条。</pre><div class="sub" style="margin:8px 0">也支持「1. 为什么这样认为？」等编号标题，以及 Markdown 标题。</div></details>
     <div class="row"><button class="btn" id="pasteFromClipboard">从剪贴板粘贴</button><span class="sub" style="margin:0">也可点击输入框，按 ⌘V / Ctrl+V</span></div>
     <textarea id="structuredPasteText" class="capture" aria-label="粘贴完整修改稿" placeholder="在这里粘贴完整修改稿" style="margin-top:10px"></textarea>
-    <div id="structuredPastePreview"></div>
-    <div class="actions"><button class="btn" id="structuredPasteCancel">取消</button><span class="spacer"></span><button class="btn" id="structuredPasteParse">识别并预览</button><button class="btn primary" id="structuredPasteApply" disabled>应用并覆盖</button></div>`, { wide: true });
-  const input = $('#structuredPasteText', m), preview = $('#structuredPastePreview', m), apply = $('#structuredPasteApply', m);
-  let matched = null;
-  const invalidate = () => { matched = null; apply.disabled = true; preview.innerHTML = ''; };
-  input.addEventListener('input', invalidate);
+    <div id="structuredPasteError"></div>
+    <div class="actions"><button class="btn" id="structuredPasteCancel">取消</button><button class="btn primary" id="structuredPasteApply">识别并应用</button></div>`, { wide: true });
+  const input = $('#structuredPasteText', m), error = $('#structuredPasteError', m);
+  input.addEventListener('input', () => { error.innerHTML = ''; });
   $('#structuredPasteCancel', m).addEventListener('click', closeModal);
   $('#pasteFromClipboard', m).addEventListener('click', async () => {
-    try { const text = await navigator.clipboard.readText(); if (!text) { toast('剪贴板没有文本，请手动粘贴', true); return; } input.value = text; invalidate(); input.focus(); }
+    try { const text = await navigator.clipboard.readText(); if (!text) { toast('剪贴板没有文本，请手动粘贴', true); return; } input.value = text; error.innerHTML = ''; input.focus(); }
     catch (_) { input.focus(); toast('请在输入框按 ⌘V / Ctrl+V 粘贴', true); }
   });
-  $('#structuredPasteParse', m).addEventListener('click', async () => {
+  $('#structuredPasteApply', m).addEventListener('click', async () => {
     const text = input.value.trim();
-    invalidate();
     if (!text) { toast('请先粘贴修改稿', true); input.focus(); return; }
     try {
       const parsed = await api('POST', '/api/parse', { files: [{ filename: '粘贴的内容.md', text }] });
       if (S.editing !== editing || !m.isConnected || input.value.trim() !== text) return;
       const entries = parsed.files.flatMap(f => f.entries);
       if (entries.length !== 1 || !entries[0].conclusion || !entries[0].why || !entries[0].how) {
-        preview.innerHTML = '<div class="notice" style="margin-top:12px">未完整识别。请按示例填写标题、为什么这样认为和以后怎么做三个栏目，原有内容没有改变。</div>';
+        error.innerHTML = '<div class="notice" style="margin-top:12px">未完整识别。请按示例填写标题、为什么这样认为和以后怎么做三个栏目，原有内容没有改变。</div>';
         return;
       }
-      matched = entries[0];
-      preview.innerHTML = `<div class="sub-title" style="margin-top:14px">识别预览</div><div class="notice" style="display:block"><b>标题：</b>${esc(matched.conclusion)}<br><br><b>为什么这样认为：</b><br>${esc(matched.why).replace(/\n/g, '<br>')}<br><br><b>以后怎么做：</b><br>${esc(matched.how).replace(/\n/g, '<br>')}</div>`;
-      apply.disabled = false;
+      const matched = entries[0];
+      Object.assign(editing.draft, { conclusion: matched.conclusion, why: matched.why, how: matched.how });
+      saveDraft(); closeModal(); renderDetail(); toast('已填入，请检查后保存');
     } catch (err) { toast('识别失败：' + err.message, true); }
-  });
-  apply.addEventListener('click', () => {
-    if (!matched || S.editing !== editing) return;
-    Object.assign(editing.draft, { conclusion: matched.conclusion, why: matched.why, how: matched.how });
-    saveDraft(); closeModal(); renderDetail(); toast('已填入，请检查后保存');
   });
 }
 
@@ -716,6 +710,7 @@ function openMerge(idA, idB) {
       why: combine(main.why, other.why),
       how: combine(main.how, other.how),
       raw: combine(main.raw, [other.conclusion && other.conclusion !== main.conclusion ? `（合并自：${other.conclusion}）` : '', other.raw].filter(Boolean).join('\n')),
+      prompt: combine(main.prompt, other.prompt),
       tags: [...new Set([...(main.tags || []), ...(other.tags || [])])],
       type: main.type,
     };
@@ -731,12 +726,13 @@ function openMerge(idA, idB) {
         <div class="field"><label>为什么这样认为</label><textarea id="mW">${esc(merged.why)}</textarea></div>
         <div class="field"><label>以后怎么做</label><textarea id="mH">${esc(merged.how)}</textarea></div>
         <div class="field"><label>原始记录（两条都保留）</label><textarea id="mR">${esc(merged.raw)}</textarea></div>
+        <div class="field"><label>提示词（两条都保留）</label><textarea id="mPrompt">${esc(merged.prompt)}</textarea></div>
       </div>
       <div class="actions"><button class="btn" id="mCancel">取消</button><button class="btn primary" id="mOk">确认合并</button></div>`, { wide: true });
     $('#mSwap', m).addEventListener('click', () => { [main, other] = [other, main]; draw(); });
     $('#mCancel', m).addEventListener('click', closeModal);
     $('#mOk', m).addEventListener('click', async () => {
-      const patch = { conclusion: $('#mC').value, why: $('#mW').value, how: $('#mH').value, raw: $('#mR').value, tags: merged.tags, type: merged.type };
+      const patch = { conclusion: $('#mC').value, why: $('#mW').value, how: $('#mH').value, raw: $('#mR').value, prompt: $('#mPrompt').value, tags: merged.tags, type: merged.type };
       if (main.status === 'inbox' && patch.conclusion.trim()) patch.status = 'active';
       try {
         const r = await api('POST', '/api/merge', { target_id: main.id, source_id: other.id, patch });
@@ -836,7 +832,7 @@ function openImport() {
     $('#impCancel', m).addEventListener('click', closeModal);
     $('#impGo', m).addEventListener('click', async () => {
       const items = sel.map((e) => {
-        const base = { conclusion: e.conclusion, why: e.why, how: e.how, raw: e.raw, tags: e.tags, type: e.type || '短线', source_file: e.source_file, source_text: e.source_text, source_hash: e.source_hash, id: e.id, created: e.created, source: e.source || '导入' };
+        const base = { conclusion: e.conclusion, why: e.why, how: e.how, raw: e.raw, prompt: e.prompt, prompt_present: e.prompt_present, tags: e.tags, type: e.type || '短线', source_file: e.source_file, source_text: e.source_text, source_hash: e.source_hash, id: e.id, created: e.created, source: e.source || '导入' };
         if (e.status) base.status = e.status;
         if (e.match.status === 'changed' || e.match.status === 'same') return { ...base, action: 'update', target_id: e.match.match_id };
         return { ...base, action: 'create' };
@@ -934,6 +930,7 @@ function entryToMd(e) {
   if (e.why) out.push('### 为什么这样认为', e.why, '');
   if (e.how) out.push('### 以后怎么做', e.how, '');
   if (e.raw) out.push('### 原始记录', e.raw.split('\n').map((l) => '> ' + l).join('\n'), '');
+  if (e.prompt) out.push('### 提示词', e.prompt.split('\n').map((l) => '> ' + l).join('\n'), '');
   return out.join('\n');
 }
 
@@ -964,6 +961,10 @@ async function act(name) {
     case 'switch': {
       const t = e.type === '短线' ? '长线' : '短线';
       const r = await api('PUT', '/api/entries/' + e.id, { type: t }); upsertLocal(r.entry); renderAll(); toast(`已转为${t}`); break;
+    }
+    case 'copyPrompt': {
+      try { await navigator.clipboard.writeText(e.prompt); toast('已复制提示词'); } catch (_) { toast('复制失败，请手动选择文字', true); }
+      break;
     }
     case 'copy': {
       try { await navigator.clipboard.writeText(entryToMd(e)); toast('已复制这条的 Markdown'); } catch (_) { toast('浏览器不允许复制', true); }
@@ -1002,10 +1003,11 @@ function viewHistory(idx) {
     ${h.why ? `<div class="block why" style="margin-top:10px"><div class="block-label">为什么这样认为</div><div class="block-body">${md(h.why)}</div></div>` : ''}
     ${h.how ? `<div class="block how"><div class="block-label">以后怎么做</div><div class="block-body">${md(h.how)}</div></div>` : ''}
     ${h.raw ? `<div class="block"><div class="block-label">原始记录</div><div class="block-body">${md(h.raw)}</div></div>` : ''}
+    ${h.prompt ? `<div class="block"><div class="block-label">提示词</div><div class="block-body">${md(h.prompt)}</div></div>` : ''}
     <div class="actions"><button class="btn" id="hClose">关闭</button><button class="btn primary" id="hRestore">恢复为这个版本</button></div>`);
   $('#hClose', m).addEventListener('click', closeModal);
   $('#hRestore', m).addEventListener('click', async () => {
-    const r = await api('PUT', '/api/entries/' + e.id, { conclusion: h.conclusion, why: h.why, how: h.how, raw: h.raw, tags: h.tags, type: h.type });
+    const r = await api('PUT', '/api/entries/' + e.id, { conclusion: h.conclusion, why: h.why, how: h.how, raw: h.raw, ...(Object.hasOwn(h, 'prompt') ? { prompt: h.prompt || '' } : {}), tags: h.tags, type: h.type });
     upsertLocal(r.entry); closeModal(); renderAll(); toast('已恢复（当前版本也已存入历史）');
   });
 }
@@ -1025,7 +1027,7 @@ function renderAll() { buildDf(); renderNav(); renderList(); renderDetail(); }
 
 function selectEntry(id) {
   if (S.editing) { const ed = S.editing; const orig = ed.id ? byId(ed.id) : null; const d = ed.draft;
-    const dirty = orig ? ['conclusion', 'why', 'how', 'raw'].some((k) => (orig[k] || '') !== (d[k] || '')) : normalize([d.conclusion, d.why, d.how, d.raw].join(''));
+    const dirty = orig ? ['conclusion', 'why', 'how', 'raw', 'prompt'].some((k) => (orig[k] || '') !== (d[k] || '')) : normalize([d.conclusion, d.why, d.how, d.raw, d.prompt].join(''));
     if (dirty && !confirm('有未保存的修改，确定放弃吗？')) return; S.editing = null; clearDraft(); }
   S.selectedId = id;
   $$('.card').forEach((c) => c.classList.toggle('selected', c.dataset.id === id));
@@ -1109,7 +1111,7 @@ async function init() {
   // 恢复上次未保存的草稿
   try {
     const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
-    if (d && d.draft && normalize([d.draft.conclusion, d.draft.why, d.draft.how, d.draft.raw].join(''))) {
+    if (d && d.draft && normalize([d.draft.conclusion, d.draft.why, d.draft.how, d.draft.raw, d.draft.prompt].join(''))) {
       S.editing = d; if (d.id) S.selectedId = d.id;
       setTimeout(() => toast('已恢复上次没保存的草稿'), 300);
     }

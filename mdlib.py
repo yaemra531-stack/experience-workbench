@@ -16,6 +16,7 @@ FIELD_ALIASES = [
     ("why", ["为什么这样认为", "为什么这么认为", "为什么", "为何", "原因", "依据", "理由", "背景"]),
     ("how", ["以后怎么做", "下次怎么做", "之后怎么做", "怎么做", "行动建议", "行动", "做法", "方法", "建议"]),
     ("raw", ["原始记录", "原始想法", "原始对话", "原文"]),
+    ("prompt", ["提示词"]),
 ]
 ALIAS_LIST = sorted(
     [(alias, field) for field, aliases in FIELD_ALIASES for alias in aliases],
@@ -184,7 +185,8 @@ def _first_sentence(text, limit=60):
 
 
 def parse_section(title, body_lines, title_is_heading=True):
-    fields = {"conclusion": [], "why": [], "how": [], "raw": []}
+    fields = {"conclusion": [], "why": [], "how": [], "raw": [], "prompt": []}
+    seen_prompt = False
     loose = []
     meta = {}
     current = None
@@ -198,9 +200,11 @@ def parse_section(title, body_lines, title_is_heading=True):
                 continue
             if line.strip():
                 meta_zone = False
-        lab = match_field_label(line)
+        lab = None if current in ("raw", "prompt") and line.lstrip().startswith(">") else match_field_label(line)
         if lab:
             current, inline = lab
+            if current == "prompt":
+                seen_prompt = True
             seen_field = True
             if inline:
                 fields[current].append(inline)
@@ -241,6 +245,8 @@ def parse_section(title, body_lines, title_is_heading=True):
         "why": f["why"],
         "how": f["how"],
         "raw": raw.strip(),
+        "prompt": f["prompt"],
+        "prompt_present": seen_prompt,
         "tags": tags,
         "source": meta.get("source") or "",
         "created": meta.get("created") or None,
@@ -409,6 +415,9 @@ def entry_to_markdown(e, heading_level=2):
     if e.get("raw"):
         quoted = "\n".join(("> " + l) if l.strip() else ">" for l in e["raw"].strip().split("\n"))
         out += [f"{sub} 原始记录", quoted, ""]
+    if e.get("prompt"):
+        quoted = "\n".join(("> " + l) if l.strip() else ">" for l in e["prompt"].strip().split("\n"))
+        out += [f"{sub} 提示词", quoted, ""]
     return "\n".join(out).rstrip() + "\n"
 
 

@@ -116,7 +116,7 @@ class Store:
         return None
 
 
-EDITABLE = ("type", "status", "conclusion", "why", "how", "raw", "tags", "source")
+EDITABLE = ("type", "status", "conclusion", "why", "how", "raw", "prompt", "tags", "source")
 
 
 def new_id():
@@ -150,6 +150,7 @@ def make_entry(d):
         "why": "",
         "how": "",
         "raw": "",
+        "prompt": "",
         "tags": [],
         "source": "",
         "created": d.get("created") or now_iso(),
@@ -164,7 +165,7 @@ def make_entry(d):
 
 
 def snapshot(e):
-    return {k: e.get(k) for k in ("conclusion", "why", "how", "raw", "tags", "type", "status")} | {"at": e.get("updated")}
+    return {k: e.get(k) for k in ("conclusion", "why", "how", "raw", "prompt", "tags", "type", "status")} | {"at": e.get("updated")}
 
 
 def update_entry(e, patch, keep_history=True):
@@ -201,7 +202,7 @@ def classify(parsed, store_entries, ignore_ids=()):
     th = mdlib.content_hash(text)
     if parsed.get("id") and parsed["id"] in by_id:
         cur = by_id[parsed["id"]]
-        same = all((cur.get(k) or "") == (parsed.get(k) or "") for k in ("conclusion", "why", "how", "raw"))
+        same = all((cur.get(k) or "") == (parsed.get(k) or "") for k in ("conclusion", "why", "how", "raw")) and (not parsed.get("prompt_present") or (cur.get("prompt") or "") == (parsed.get("prompt") or ""))
         return {"status": "same" if same else "changed", "match_id": cur["id"]}
     for e in store_entries:
         if e.get("source_hash") == h or mdlib.content_hash(mdlib.entry_text(e)) == th:
@@ -269,6 +270,8 @@ def do_import(store, items):
             cur = store.get(it["target_id"])
             if cur:
                 patch = {k: it[k] for k in ("conclusion", "why", "how", "raw", "tags", "type") if k in it and it[k] not in (None,)}
+                if it.get("prompt_present"):
+                    patch["prompt"] = it.get("prompt", "")
                 if update_entry(cur, patch):
                     updated += 1
                 cur["source_hash"] = it.get("source_hash", cur.get("source_hash"))
