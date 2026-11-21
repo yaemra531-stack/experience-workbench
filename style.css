@@ -261,3 +261,26 @@ select.inline { border: 1px solid var(--line); background: var(--panel); border-
 .back-mobile { display: none; }
 
 .imp-file-head select { border: 1px solid var(--line); background: var(--panel); border-radius: 7px; font-size: 12px; padding: 3px 6px; }
+
+/* 创作工作台 */
+[hidden] { display: none !important; }
+.creative-nav-title { font-size: 11px; color: var(--ink-3); letter-spacing: 1px; padding: 8px 10px 2px; }
+.creative-list-actions { padding: 12px 14px 4px; display: flex; gap: 6px; }
+.creative-list-actions .btn { flex: 1; }
+.creative-search { display: flex; flex-direction: column; gap: 6px; padding: 10px 14px; }
+.creative-search input, .creative-search select { width: 100%; border: 1px solid var(--line); background: var(--panel); border-radius: 9px; padding: 8px 10px; }
+.creative-section { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); margin: 12px 0; padding: 0 16px 14px; }
+.creative-section > summary { padding: 14px 0; cursor: pointer; font-weight: 650; }
+.creative-section .field { margin-bottom: 13px; }
+.creative-section .field label { display: block; font-size: 12px; color: var(--ink-2); font-weight: 600; margin-bottom: 4px; }
+.creative-section input, .creative-section textarea, .creative-section select { width: 100%; padding: 8px 10px; border: 1px solid var(--line); background: var(--bg); border-radius: 8px; }
+.creative-section textarea { min-height: 86px; resize: vertical; line-height: 1.6; }
+.creative-section .field:has(textarea) { grid-column: 1 / -1; }
+.creative-section .grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap: 0 12px; }
+.creative-section .sub { color: var(--ink-3); font-size: 12px; margin: 2px 0 12px; }
+.creative-sticky { position: sticky; bottom: 0; display: flex; gap: 8px; padding: 14px 0; background: var(--bg); align-items: center; flex-wrap: wrap; }
+.creative-hint { color: var(--ink-3); font-size: 12px; }
+.creative-empty { padding: 60px 20px; color: var(--ink-3); text-align: center; }
+.creative-heading { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.creative-heading h1 { margin: 0; }
+.creative-links button { display: block; width: 100%; text-align: left; margin: 4px 0; }

@@ -1094,6 +1094,7 @@ function bind() {
   $('#btnReview').addEventListener('click', review);
 
   document.addEventListener('keydown', (ev) => {
+    if (!$('#creativeApp').hidden) return;
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName);
     if (ev.key === 'Escape') {
       if ($('.modal-backdrop[style]')) { $('.modal-backdrop[style]').remove(); return; }
