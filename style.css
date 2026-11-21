@@ -91,6 +91,7 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; padding: 0 1
 .empty-list .big { font-size: 28px; margin-bottom: 6px; }
 
 .chip { display: inline-flex; align-items: center; font-size: 11px; font-weight: 600; padding: 0 7px; border-radius: 99px; line-height: 19px; white-space: nowrap; }
+.chip.number { border-radius: 5px; min-width: 19px; justify-content: center; font-variant-numeric: tabular-nums; }
 .chip.短线 { color: var(--short); background: var(--short-bg); }
 .chip.长线 { color: var(--long); background: var(--long-bg); }
 .chip.inbox { color: var(--accent-2); background: var(--panel-2); border: 1px dashed var(--line); }

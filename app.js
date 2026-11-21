@@ -118,6 +118,21 @@ const S = {
 const byId = (id) => S.entries.find((e) => e.id === id);
 const alive = () => S.entries.filter((e) => e.status === 'active' || e.status === 'inbox');
 const incomplete = (e) => e.status !== 'inbox' && (!e.why || !e.how);
+// 分类内按记录时间从早到晚编号；并列时沿用原有记录顺序。
+function experienceNumbers() {
+  const numbers = new Map();
+  for (const type of TYPES) {
+    const entries = S.entries.filter(e => e.status === 'active' && e.type === type);
+    entries.sort((a, b) => String(a.created || '').localeCompare(String(b.created || '')));
+    entries.forEach((e, i) => numbers.set(e.id, i + 1));
+  }
+  return numbers;
+}
+function numberChip(e, numbers) {
+  const n = numbers.get(e.id);
+  return n ? `<span class="chip number ${esc(e.type)}" title="${esc(e.type)}第 ${n} 条" aria-label="${esc(e.type)}第 ${n} 条">${n}</span>` : '';
+}
+
 
 async function loadState() {
   const d = await api('GET', '/api/state');
@@ -220,6 +235,7 @@ function renderList() {
     return;
   }
   const shown = list.slice(0, S.limit);
+  const numbers = experienceNumbers();
   $('#list').innerHTML = shown.map((e) => {
     const title = e.conclusion
       ? `<div class="card-title">${hl(e.conclusion, ts)}</div>`
@@ -233,7 +249,7 @@ function renderList() {
     if (e.status === 'inbox') chips.push('<span class="chip inbox">待整理</span>');
     else if (e.status === 'merged') chips.push('<span class="chip ghost">已合并</span>');
     else if (e.status === 'trashed') chips.push('<span class="chip ghost">回收站</span>');
-    chips.push(`<span class="chip ${e.type}">${e.type}</span>`);
+    chips.push(`<span class="chip ${e.type}">${e.type}</span>${numberChip(e, numbers)}`);
     if (e.status === 'active' && incomplete(e)) chips.push('<span class="chip todo">待补全</span>');
     const tags = (e.tags || []).length ? `<div class="card-tags">${e.tags.slice(0, 5).map((t) => `<span class="tag">${esc(t)}</span>`).join('')}</div>` : '';
     return `<div class="card ${S.selectedId === e.id ? 'selected' : ''}" data-id="${e.id}">
@@ -309,7 +325,7 @@ function renderDetail() {
 
   const tags = (e.tags || []).map((t) => `<span class="tag">${esc(t)}</span>`).join('');
   const meta = [
-    `<span class="chip ${e.type}">${e.type}</span>`,
+    `<span class="chip ${e.type}">${e.type}</span>${numberChip(e, experienceNumbers())}`,
     tags ? `<span class="tags">${tags}</span>` : '',
     e.source ? `<span>来源：${esc(e.source)}</span>` : '',
     `<span>记录于 ${fmtDate(e.created, true)}</span>`,
