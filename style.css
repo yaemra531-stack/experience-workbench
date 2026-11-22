@@ -307,3 +307,12 @@ select.inline { border: 1px solid var(--line); background: var(--panel); border-
 .creative-prose a { color:var(--accent-2); }
 
 .creative-prose blockquote { border-left:3px solid var(--line); margin:1em 0; padding:2px 14px; color:var(--ink-2); }
+
+.cw-export-filters { display:grid; grid-template-columns:1fr 1.4fr 1fr 1fr; gap:8px; }
+.cw-export-filters label { display:flex; flex-direction:column; gap:4px; color:var(--ink-2); font-size:12px; }
+.cw-export-filters input,.cw-export-filters select { min-width:0; width:100%; border:1px solid var(--line); border-radius:8px; background:var(--panel); padding:7px 8px; }
+.cw-export-list { margin-top:12px; max-height:230px; overflow:auto; border:1px solid var(--line); border-radius:10px; background:var(--panel); }
+.cw-export-row { display:flex; align-items:flex-start; gap:10px; padding:9px 12px; border-bottom:1px solid var(--line); cursor:pointer; }
+.cw-export-row:last-child { border-bottom:0; } .cw-export-row input { margin-top:5px; } .cw-export-row span { flex:1; min-width:0; }
+.cw-export-row b { display:block; overflow-wrap:anywhere; } .cw-export-row small { color:var(--ink-3); }
+@media (max-width:700px) { .cw-export-filters { grid-template-columns:1fr 1fr; } }

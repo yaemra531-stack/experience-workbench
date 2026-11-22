@@ -130,7 +130,7 @@ ${shortTemplate}`;
       <button class="nav-item" data-action="experience">← 经验工作台</button><div class="creative-nav-title">创作工作台</div>
       <nav class="nav"><button class="nav-item ${mode==='short'?'active':''}" data-mode="short"><span class="dot" style="background:var(--short)"></span>短线 <span class="count">${db.short.length}</span></button>
       <button class="nav-item ${mode==='long'?'active':''}" data-mode="long"><span class="dot" style="background:var(--long)"></span>长线 <span class="count">${db.long.length}</span></button></nav>
-      <div class="side-bottom"><div class="creative-hint">创作记录保存在当前浏览器，建议定期备份。</div><button class="side-btn" data-action="backup">⤓ 备份创作数据</button><button class="side-btn" data-action="restore">⤒ 导入创作备份</button><input id="creativeRestore" type="file" accept=".json,application/json" hidden></div></aside>`;
+      <div class="side-bottom"><button class="side-btn" data-action="exportSelected">⤴ 选择性导出 Markdown</button><div class="creative-hint">创作记录保存在当前浏览器，建议定期备份。</div><button class="side-btn" data-action="backup">⤓ 备份创作数据</button><button class="side-btn" data-action="restore">⤒ 导入创作备份</button><input id="creativeRestore" type="file" accept=".json,application/json" hidden></div></aside>`;
   }
   function records() {
     const q=search.trim().toLowerCase();
@@ -237,6 +237,43 @@ ${shortTemplate}`;
     try{await navigator.clipboard.writeText(value);notice('已复制 Markdown');}
     catch(_){openModal(`<h3>复制 Markdown</h3><div class="sub">浏览器未允许自动复制，请手动全选复制。</div><textarea class="capture" readonly>${E(value)}</textarea><div class="actions"><button class="btn" id="cwCopyClose">关闭</button></div>`);document.getElementById('cwCopyClose').addEventListener('click',closeModal);}
   }
+  // 选择的是已保存记录；筛选只影响列表，不会取消其他已选项。
+  function openSelectedExport(){
+    const chosen=new Set();
+    const saved=[...db.short.map(x=>({kind:'short',item:x})),...db.long.map(x=>({kind:'long',item:x}))];
+    const idOf=x=>x.kind+':'+x.item.id;
+    const dateOf=value=>{const d=new Date(value);if(!value||Number.isNaN(d.getTime()))return '';return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
+    const m=openModal(`<h3>选择性导出</h3><div class="sub">选出要交给 AI 的创作记录。导出为 Markdown 文本；只包含已保存内容，不会修改原记录。${dirty?'当前编辑尚未保存，不会包含在导出中。':''}</div>
+      <div class="cw-export-filters"><label>类型<select id="ceKind"><option value="all">全部类型</option><option value="short">短线案例</option><option value="long">长线结构</option></select></label><label>搜索<input id="ceSearch" type="search" placeholder="标题、内容、编号…"></label><label>创建日期从<input id="ceStart" type="date"></label><label>到<input id="ceEnd" type="date"></label></div>
+      <div class="row"><button class="btn" id="ceAll">全选当前筛选</button><button class="btn" id="ceClear">清空选择</button><span class="creative-hint" id="ceCount"></span></div>
+      <div class="cw-export-list" id="ceList"></div><div class="sub-title" style="margin-top:14px">导出内容预览</div><textarea id="cePreview" aria-label="导出内容预览" readonly style="min-height:150px" placeholder="请先勾选要导出的记录"></textarea>
+      <div class="actions"><button class="btn" id="ceClose">关闭</button><button class="btn" id="ceDownload" disabled>下载 Markdown</button><button class="btn primary" id="ceCopy" disabled>复制给 AI</button></div>`,{wide:true});
+    const q=id=>m.querySelector(id), listEl=q('#ceList'),preview=q('#cePreview');
+    function filteredExport(){
+      const kind=q('#ceKind').value,query=q('#ceSearch').value.trim().toLowerCase(),start=q('#ceStart').value,end=q('#ceEnd').value;
+      return saved.filter(({kind:k,item:x})=>{const date=dateOf(x.created),hay=[x.code,x.title,x.url,bodyOf(x,k),k==='short'?'短线':'长线',k==='short'?practice(x):''].join('\n').toLowerCase();return (kind==='all'||kind===k)&&(!query||hay.includes(query))&&(!start||(date&&date>=start))&&(!end||(date&&date<=end));});
+    }
+    function output(){
+      const records=saved.filter(x=>chosen.has(idOf(x)));
+      return records.map(({kind,item:x})=>{
+        const rel=kind==='short'?db.long.find(y=>y.id===x.structureId):null;
+        const heading=`# ${x.code||''}｜${(x.title||'未命名').replace(/[\r\n]+/g,' ')}`;
+        const meta=[`类型：${kind==='short'?'短线案例':'长线结构'}`,kind==='short'?`状态：${practice(x)}`:'',x.url?`参考链接：${x.url}`:'',rel?`关联结构：${rel.code}｜${rel.title}`:'',x.created?`创建日期：${dateOf(x.created)}`:''].filter(Boolean).join('\n');
+        const legacy=typeof x.body==='string' && groups[kind].some(([,fields])=>fields.some(([k])=>!['title','url'].includes(k)&&x[k]!==undefined&&x[k]!==null&&String(x[k]).trim()!=='')) ? legacyBody(x,kind) : '';
+        return [heading,meta,bodyOf(x,kind),legacy?'## V1 原有字段（保留）\n\n'+legacy:''].filter(Boolean).join('\n\n');
+      }).join('\n\n---\n\n');
+    }
+    function updatePreview(){q('#ceCount').textContent=`已选择 ${chosen.size} 条`;preview.value=output();q('#ceCopy').disabled=!chosen.size;q('#ceDownload').disabled=!chosen.size;}
+    function draw(){const items=filteredExport();listEl.innerHTML=items.length?items.map(({kind,item:x})=>`<label class="cw-export-row"><input type="checkbox" data-export-kind="${kind}" data-export-id="${E(x.id)}" ${chosen.has(kind+':'+x.id)?'checked':''}><span><b>${E(x.code||'')}｜${E(x.title||'未命名')}</b><small>${kind==='short'?'短线 · '+E(practice(x)):'长线结构'}${x.created?' · '+E(dateOf(x.created)):''}</small></span></label>`).join(''):'<div class="empty-list">没有符合筛选条件的记录</div>';updatePreview();}
+    listEl.addEventListener('change',e=>{const t=e.target;if(t.dataset.exportId){const id=t.dataset.exportKind+':'+t.dataset.exportId;if(t.checked)chosen.add(id);else chosen.delete(id);updatePreview();}});
+    for(const id of ['#ceKind','#ceSearch','#ceStart','#ceEnd'])q(id).addEventListener(id==='#ceSearch'?'input':'change',draw);
+    q('#ceAll').addEventListener('click',()=>{filteredExport().forEach(x=>chosen.add(idOf(x)));draw();});
+    q('#ceClear').addEventListener('click',()=>{chosen.clear();draw();});
+    q('#ceClose').addEventListener('click',closeModal);
+    q('#ceCopy').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(preview.value);notice('已复制所选内容，可粘贴给 AI');}catch(_){preview.focus();preview.select();notice('请按 ⌘C / Ctrl+C 手动复制已选中的内容',true);}});
+    q('#ceDownload').addEventListener('click',()=>{const a=document.createElement('a');const url=URL.createObjectURL(new Blob([preview.value],{type:'text/markdown;charset=utf-8'}));a.href=url;a.download='创作工作台-所选记录.md';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);notice('已开始下载 Markdown');});
+    draw();
+  }
   function download() {const blob=new Blob([JSON.stringify({app:'creation-workbench',exportedAt:new Date().toISOString(),data:db},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='创作工作台备份-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);notice('已开始下载创作备份');}
   function restore(obj) {
     if(obj?.app!=='creation-workbench'||!obj.data||obj.data.version!==1||!Array.isArray(obj.data.short)||!Array.isArray(obj.data.long))throw Error('请选择创作工作台的备份文件');
@@ -258,7 +295,7 @@ ${shortTemplate}`;
     const r=e.target.closest('[data-select]');if(r){if(!askLeave())return;selected=r.dataset.select;draft=clone(list().find(x=>x.id===selected));editing=false;dirty=false;returnDraft=null;render();return;}
     const go=e.target.closest('[data-goto-short]');if(go){if(!askLeave())return;mode='short';selected=go.dataset.gotoShort;draft=clone(db.short.find(x=>x.id===selected));editing=false;dirty=false;search='';filter='all';render();return;}
     const a=e.target.closest('[data-action]');if(!a)return;
-    switch(a.dataset.action){case 'more':visibleLimit+=100;refreshList();break;case 'experience':if(!askLeave())return;root.hidden=true;old.hidden=false;break;case 'new':beginNew();break;case 'pasteCase':openCasePaste();break;case 'edit':editing=true;dirty=false;render();break;case 'cancelEdit':if(!askLeave())return;if(returnDraft){mode='short';draft=returnDraft;returnDraft=null;selected=db.short.some(x=>x.id===draft.id)?draft.id:null;editing=true;dirty=true;render();return;}if(selected){draft=clone(list().find(x=>x.id===selected));editing=false;dirty=false;}else{draft=null;editing=false;dirty=false;}render();break;case 'copy':copyBody();break;case 'save':save();break;case 'delete':remove();break;case 'newLinked':createLinked();break;case 'backup':download();break;case 'restore':$c('#creativeRestore').click();break;}
+    switch(a.dataset.action){case 'more':visibleLimit+=100;refreshList();break;case 'experience':if(!askLeave())return;root.hidden=true;old.hidden=false;break;case 'new':beginNew();break;case 'pasteCase':openCasePaste();break;case 'edit':editing=true;dirty=false;render();break;case 'cancelEdit':if(!askLeave())return;if(returnDraft){mode='short';draft=returnDraft;returnDraft=null;selected=db.short.some(x=>x.id===draft.id)?draft.id:null;editing=true;dirty=true;render();return;}if(selected){draft=clone(list().find(x=>x.id===selected));editing=false;dirty=false;}else{draft=null;editing=false;dirty=false;}render();break;case 'copy':copyBody();break;case 'save':save();break;case 'delete':remove();break;case 'newLinked':createLinked();break;case 'exportSelected':openSelectedExport();break;case 'backup':download();break;case 'restore':$c('#creativeRestore').click();break;}
   });
   window.addEventListener('beforeunload',e=>{if(!root.hidden&&dirty){e.preventDefault();e.returnValue='';}});
 })();
