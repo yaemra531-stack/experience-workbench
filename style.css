@@ -292,6 +292,8 @@ select.inline { border: 1px solid var(--line); background: var(--panel); border-
 .cw-edit .field { margin: 14px 0; }
 .cw-edit .field > label { display:block; font-weight:600; color:var(--ink-2); margin-bottom:6px; }
 .cw-edit select { padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:var(--panel); }
+.cw-edit input:not([type]), .cw-edit input[type=url] { width:100%; border:1px solid var(--line); background:var(--panel); color:var(--ink); border-radius:10px; padding:10px 12px; outline:none; line-height:1.7; }
+.cw-edit input:not([type]):focus, .cw-edit input[type=url]:focus { border-color:var(--accent-2); box-shadow:0 0 0 3px rgba(51,78,104,.12); }
 .cw-markdown-input { min-height: 54vh !important; font-family:var(--mono); font-size:14px; line-height:1.75; }
 .creative-prose { font-size:15.5px; line-height:1.85; overflow-wrap:anywhere; }
 .creative-prose h1,.creative-prose h2,.creative-prose h3,.creative-prose h4 { color:var(--ink); line-height:1.45; margin:1.6em 0 .7em; }

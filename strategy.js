@@ -6,7 +6,7 @@
   // ===== 战略内容（改这里）=====
   const STRATEGY = {
     name: '短线',                                  // 战略名
-    goal: '一年内做 1000 条短视频',                  // 目标一句话
+    goal: '一年 1000 次发布（视频和文章都算）',                  // 目标一句话
     target: 1000,                                   // 目标总条数
     perDay: 3,                                      // 每天目标条数
     startDate: '2026-11-26',                        // 生效日期
@@ -15,18 +15,19 @@
       '一段时间只要一个战略，不随时调整；有新想法先记下来，到检查点再一起看。',
       '优质是练出来的，不是每一条的标准：短线的标准是「发出去」。',
     ],
-    // 三个栏目（名称要和创作工作台里的「栏目」选项一致）
+    notDo: ['第 100 条之前不改系统', '不用单条视频的数据评判自己', '不追每一个新功能新工具', '不开新平台不另立新战略'],
+    // 栏目名称与创作工作台一致
     columns: [
       { name: '想法观察', len: '约 15 秒', role: '保底，保证每天都有东西发', rhythm: '每天 1 条' },
       { name: '新东西上手', len: '15～30 秒', role: '抢时效，满足爽和好奇', rhythm: '有新东西就做' },
       { name: '痛点解法', len: '约 60 秒', role: '拿收藏，最容易接商单', rhythm: '有好选题才做，不硬凑' },
+      { name: '文章', len: '复盘', role: '把今天最有感觉的点写下来', rhythm: '晚上' },
     ],
     daily: [
-      '保底：先发 1 条想法 / 观察',
-      '有新模型、新功能，就抢时效做上手',
-      '看选题晨报，有好选题再做痛点解法',
-      '一次录、多次剪；集中录 2～3 条',
-      '发完把状态改成「已实践」，选好栏目',
+      ['30 分钟', '保底：录 1 条想法观察，发掉'],
+      ['1～1.5 小时', '第二条视频：新东西上手 / 盘点 / 痛点解法'],
+      ['1～1.5 小时', '分析加升级：拆一个好内容，马上照着做一条'],
+      ['晚上 1 小时', '写文章，当今天的复盘'],
     ],
     desiresNote: '所有栏目通用：每条都要有一个让人停下来的理由。',
     desires: [
@@ -60,6 +61,9 @@
   const dayKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const today = () => dayKey(new Date());
 
+  function latestUpgrade() {
+    try { const db=JSON.parse(localStorage.getItem(CREATION_KEY)||'null'); return (Array.isArray(db?.analysis)?db.analysis:[]).filter(a=>(a.status||'待用')==='待用' && String(a.upgrade||'').trim()).sort((a,b)=>String(b.updated||b.created||'').localeCompare(String(a.updated||a.created||'')))[0]?.upgrade||''; } catch (_) { return ''; }
+  }
   function progress() {
     let done = 0, todayDone = 0;
     const byColumn = Object.fromEntries(STRATEGY.columns.map(c => [c.name, 0]));
@@ -86,7 +90,7 @@
       <span class="ns-label">当前战略 · ${E(STRATEGY.name)}</span>
       <span class="ns-today ${hit ? 'hit' : ''}">今天 <b>${p.todayDone}</b> / ${STRATEGY.perDay} 条</span>
       <span class="ns-bar"><i style="width:${p.pct.toFixed(2)}%"></i></span>
-      <span class="ns-count">总计 <b>${p.done}</b> / ${STRATEGY.target} · 第 ${p.day} 天</span>
+      <span class="ns-count">总计 <b>${p.done}</b> / ${STRATEGY.target} · 第 ${p.day} 天</span>${latestUpgrade()?`<span class="ns-upgrade"><strong>今天的升级点</strong> ${E(latestUpgrade())}</span>`:''}
     </button>`;
   }
 
@@ -95,7 +99,7 @@
       <div class="ns-board">
         <div class="ns-top"><span>当前战略 · 自 ${E(STRATEGY.startDate)} 起生效</span><span>下一个检查点：已实践 ${p.next} 条</span></div>
         <h1 class="ns-title">${E(STRATEGY.name)}：${E(STRATEGY.goal)}</h1>
-        ${STRATEGY.principles.map(s => `<p class="ns-principle">${E(s)}</p>`).join('')}
+        ${STRATEGY.principles.map(s => `<p class="ns-principle">${E(s)}</p>`).join('')}<section class="ns-sec"><h2>不为清单</h2><ul class="ns-list">${STRATEGY.notDo.map(s=>`<li>${E(s)}</li>`).join('')}</ul></section>
 
         <section class="ns-sec ns-progress">
           <div class="ns-progress-head">
@@ -106,14 +110,14 @@
         </section>
 
         <section class="ns-sec">
-          <h2>三个栏目 · 一天 ${STRATEGY.perDay} 条，按成本配</h2>
+          <h2>栏目 · 按成本配</h2>
           <div class="ns-columns">${STRATEGY.columns.map(c => `<div class="ns-column"><div class="ns-column-head"><b>${E(c.name)}</b><span>${p.byColumn[c.name]} 条</span></div><span class="ns-column-len">${E(c.len)} · ${E(c.rhythm)}</span><em>${E(c.role)}</em></div>`).join('')}</div>
         </section>
 
         <div class="ns-cols">
           <section class="ns-sec">
             <h2>每天怎么做</h2>
-            <ol class="ns-list">${STRATEGY.daily.map(s => `<li>${E(s)}</li>`).join('')}</ol>
+            <div class="ns-time-wrap"><table class="ns-time"><thead><tr><th>时间</th><th>安排</th></tr></thead><tbody>${STRATEGY.daily.map(([time,task])=>`<tr><td>${E(time)}</td><td>${E(task)}</td></tr>`).join('')}</tbody></table></div><p class="ns-note">被打断时从后往前砍，保底永远不砍。手里常备 2 条存货。</p>
           </section>
           <section class="ns-sec">
             <h2>红线</h2>
@@ -126,6 +130,7 @@
           <div class="ns-desires">${STRATEGY.desires.map(d => `<div class="ns-desire"><b>${E(d.name)}</b><span>${E(d.heart)}</span><em>「${E(d.hook)}」</em></div>`).join('')}</div>
         </section>
 
+        <section class="ns-sec"><h2>想法观察公式</h2><p>一件 AI 的事 + 真实反应 + 一句判断或一个问题</p></section>
         <section class="ns-sec">
           <h2>${E(STRATEGY.formulaTitle)}</h2>
           <div class="ns-formula">${STRATEGY.formula.map(f => `<span class="ns-term"><b>${E(f.name)}</b><small>${E(f.sub)}</small></span>`).join('<span class="ns-times">×</span>')}</div>
@@ -157,7 +162,7 @@
   let lastKey = '';
   function mount() {
     const p = progress();
-    const key = `${p.done}|${p.todayDone}|${p.day}`;
+    const key = `${p.done}|${p.todayDone}|${p.day}|${latestUpgrade()}`;
     document.querySelectorAll('.sidebar').forEach(sb => {
       const brand = sb.querySelector('.brand');
       if (!brand) return;
@@ -184,7 +189,7 @@
         : column === '想法观察'
           ? ['① 一句话说得完吗？', '② 像跟朋友聊天吗？']
           : ['让人停下来的理由是什么？'];
-    field.insertAdjacentHTML('beforebegin', `<div class="ns-check"><span class="ns-check-title">对照战略</span>${tips.map(t => `<span>${E(t)}</span>`).join('')}</div>`);
+    field.insertAdjacentHTML('beforebegin', `<div class="ns-check"><span class="ns-check-title">对照战略</span>${tips.map(t => `<span>${E(t)}</span>`).join('')}${latestUpgrade()?`<span><strong>今天的升级点：</strong>${E(latestUpgrade())}</span>`:''}</div>`);
   }
 
   let queued = false;

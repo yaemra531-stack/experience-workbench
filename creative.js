@@ -6,7 +6,7 @@
   const old = document.getElementById('app');
   const E = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const $c = s => root.querySelector(s);
-  const blank = () => ({version:1,nextC:1,nextS:1,short:[],long:[]});
+  const blank = () => ({version:1,nextC:1,nextS:1,nextA:1,short:[],long:[],analysis:[]});
   let db, lastSnapshot=null, mode='short', selected=null, draft=null, editing=false, dirty=false, returnDraft=null, search='', filter='all', visibleLimit=100;
   const statuses=['待实践','已实践'];
   const practice = x => x.practiceStatus || (x.status === '已发布' ? '已实践' : '待实践');
@@ -100,7 +100,7 @@
 - **当前判断：** 待实践。`;
   const templates = { topic: ['解法', topicTemplate], tryout: ['上手', tryoutTemplate], idea: ['想法', ideaTemplate], case: ['拆案例', shortTemplate] };
   // 栏目：名称要和战略看板 strategy.js 里的栏目一致
-  const COLUMNS = ['想法观察', '新东西上手', '痛点解法', '其他'];
+  const COLUMNS = ['想法观察', '新东西上手', '痛点解法', '文章', '其他'];
   const COLUMN_TEMPLATE = { '痛点解法': 'topic', '新东西上手': 'tryout', '想法观察': 'idea' };
   const DESIRES = ['懒', '怕', '贪', '面子', '爽好奇', '被说中'];
   const METRICS = [['views','播放'],['favorites','收藏'],['follows','关注']];
@@ -126,6 +126,7 @@ ${topicTemplate}`;
 ## 实践验证
 
 待实践。`;
+  const analysisTemplate = '## 开头\n\n## 节奏\n\n## 画面\n\n## 标题与结尾\n';
   const verify=['待实践','实践中','已有反馈','待修正'];
   const groups = {
     short: [
@@ -143,7 +144,7 @@ ${topicTemplate}`;
     ]
   };
   function notice(text, err=false) { if (typeof toast === 'function') toast(text,err); }
-  function read() { const v=localStorage.getItem(KEY); lastSnapshot=v; if (!v) return blank(); const d=JSON.parse(v); if(d.version!==1 || !Array.isArray(d.short)||!Array.isArray(d.long)) throw Error('创作数据格式不受支持'); return d; }
+  function read() { const v=localStorage.getItem(KEY); lastSnapshot=v; if (!v) return blank(); const d=JSON.parse(v); if(d.version!==1 || !Array.isArray(d.short)||!Array.isArray(d.long) || (d.analysis!==undefined && !Array.isArray(d.analysis))) throw Error('创作数据格式不受支持'); if(!d.analysis)d.analysis=[]; if(!d.nextA)d.nextA=1; return d; }
   function commit(next) { try { if (localStorage.getItem(KEY) !== lastSnapshot) { notice('其他页面修改了创作数据，请先复制当前未保存内容，再返回经验工作台并重新进入',true); return false; } const payload=JSON.stringify(next); localStorage.setItem(KEY, payload); lastSnapshot=payload; db=next; return true; } catch(e) { notice('保存失败：浏览器空间可能不足，请先备份并检查存储空间',true); return false; } }
   function clone(x) { return JSON.parse(JSON.stringify(x)); }
   function localTime(value) { const date=new Date(value); return value && !Number.isNaN(date.getTime()) ? date.toLocaleString('zh-CN',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}) : String(value||'').replace('T',' ').slice(0,16); }
@@ -152,7 +153,7 @@ ${topicTemplate}`;
   function list() { return db[mode]; }
   function askLeave() { return !dirty || confirm('当前修改还没有保存，确定放弃吗？'); }
   function switchMode(next) { if (!askLeave()) return; mode=next; selected=null; draft=null; editing=false; dirty=false; returnDraft=null; search='';filter='all';visibleLimit=100;render(); }
-  function newDraft(kind=mode) { return {id:uid(),code:'保存后生成',created:new Date().toISOString(),updated:new Date().toISOString(),title:'', ...(kind==='short'?{practiceStatus:'待实践',structureId:'',column:'',desire:'',body:topicTemplate}:{body:longTemplate})}; }
+  function newDraft(kind=mode) { return {id:uid(),code:'保存后生成',created:new Date().toISOString(),updated:new Date().toISOString(),title:'', ...(kind==='short'?{practiceStatus:'待实践',structureId:'',column:'',desire:'',body:topicTemplate}:kind==='analysis'?{status:'待用',shortId:'',upgrade:'',body:analysisTemplate}:{body:longTemplate})}; }
   // 切换正文模板：正文是空的或还是某个模板原样时直接换；写过内容就先确认
   function useTemplate(key) {
     if(!draft||mode!=='short'||!templates[key])return;
@@ -172,10 +173,22 @@ ${topicTemplate}`;
     if(!draft)return;
     if (mode==='short' && !String(draft.title||'').trim() && !String(draft.url||'').trim() && !String(draft.transcript||'').trim()) {notice('请填写标题或参考视频链接',true);return;}
     if(mode==='long'&&!String(draft.title||'').trim()){notice('请填写结构或方法名称',true);return;}
+    if(mode==='analysis'&&(!String(draft.title||'').trim()||!String(draft.upgrade||'').trim())){notice('请填写标题和升级点',true);return;}
+    if(mode==='analysis'&&/[\r\n]/.test(draft.upgrade.trim())){notice('升级点请写成一句话',true);return;}
     const next=clone(db), entry=clone(draft), idx=next[mode].findIndex(x=>x.id===entry.id);
     // 记下第一次标为「已实践」的时间，战略看板用它算「今天已实践几条」
     if(mode==='short'){ if(practice(entry)==='已实践'){ if(!entry.practicedAt && (idx<0 || practice(next.short[idx])!=='已实践')) entry.practicedAt=new Date().toISOString(); } else delete entry.practicedAt; }
-    if(idx<0) {const k=mode==='short'?'nextC':'nextS';entry.code=code(mode==='short'?'C':'S',next[k]||1);next[k]=(next[k]||1)+1;next[mode].push(entry);} else next[mode][idx]=entry;
+    if(idx<0) {const k=mode==='short'?'nextC':mode==='long'?'nextS':'nextA', prefix=mode==='short'?'C':mode==='long'?'S':'A'; let n=next[k]||1; while(next[mode].some(x=>x.code===code(prefix,n)))n++; entry.code=code(prefix,n);next[k]=n+1;next[mode].push(entry);} else next[mode][idx]=entry;
+    // 一条短线关联一条分析；在同一次本地写入里同步反向关联和状态。
+    if(mode==='short'){
+      next.analysis.forEach(a=>{if(a.shortId===entry.id && a.id!==entry.analysisId)a.shortId='';});
+      const a=next.analysis.find(a=>a.id===entry.analysisId);
+      if(a){next.short.forEach(x=>{if(x.id!==entry.id&&x.analysisId===a.id)x.analysisId='';}); a.shortId=entry.id;a.status='已用';}
+    } else if(mode==='analysis'){
+      next.short.forEach(x=>{if(x.analysisId===entry.id && x.id!==entry.shortId)x.analysisId='';});
+      const target=next.short.find(x=>x.id===entry.shortId);
+      if(target){next.analysis.forEach(a=>{if(a.id!==entry.id&&a.shortId===target.id)a.shortId='';});target.analysisId=entry.id;entry.status='已用';}
+    }
     entry.updated=new Date().toISOString();
     if(!commit(next))return;
     selected=entry.id;draft=clone(entry);editing=false;dirty=false;
@@ -188,6 +201,8 @@ ${topicTemplate}`;
     if(!confirm(`删除「${item.title || item.code}」？${related ? `关联的 ${related} 条短线记录会保留，关联将解除；删除的长线无法撤销。` : '删除后无法在工作台中撤销，请先确认已有备份。'}`))return;
     const next=clone(db);next[mode]=next[mode].filter(x=>x.id!==item.id);
     if(mode==='long') next.short.forEach(x=>{if(x.structureId===item.id)x.structureId='';});
+    if(mode==='analysis') next.short.forEach(x=>{if(x.analysisId===item.id)x.analysisId='';});
+    if(mode==='short') next.analysis.forEach(x=>{if(x.shortId===item.id)x.shortId='';});
     if(!commit(next))return; selected=null;draft=null;editing=false;dirty=false;render();notice('已删除');
   }
   function createLinked() {
@@ -211,7 +226,7 @@ ${topicTemplate}`;
     return `<aside class="sidebar"><div class="brand"><div class="logo">创</div><div><div class="brand-name">创作工作台</div><div class="brand-sub">短 · 快 · 多</div></div></div>
       <button class="nav-item" data-action="experience">← 经验工作台</button><div class="creative-nav-title">创作工作台</div>
       <nav class="nav"><button class="nav-item ${mode==='short'?'active':''}" data-mode="short"><span class="dot" style="background:var(--short)"></span>短线 <span class="count">${db.short.length}</span></button>
-      <button class="nav-item ${mode==='long'?'active':''}" data-mode="long"><span class="dot" style="background:var(--long)"></span>长线 <span class="count">${db.long.length}</span></button></nav>
+      <button class="nav-item ${mode==='long'?'active':''}" data-mode="long"><span class="dot" style="background:var(--long)"></span>长线 <span class="count">${db.long.length}</span></button><button class="nav-item ${mode==='analysis'?'active':''}" data-mode="analysis"><span class="dot" style="background:var(--ink-3)"></span>分析 <span class="count">${db.analysis.length}</span></button></nav>
       <div class="side-bottom"><button class="side-btn" data-action="exportSelected">⤴ 选择性导出 Markdown</button><div class="creative-hint">创作记录保存在当前浏览器，建议定期备份。</div><button class="side-btn" data-action="backup">⤓ 备份创作数据</button><button class="side-btn" data-action="restore">⤒ 导入创作备份</button><input id="creativeRestore" type="file" accept=".json,application/json" hidden></div></aside>`;
   }
   function records() {
@@ -219,11 +234,11 @@ ${topicTemplate}`;
     const items=list().filter(x=>{
       const structure=db.long.find(a=>a.id===x.structureId);
       const values=[...Object.values(x),structure?.title||'',structure?.steps||''].join(' ').toLowerCase();
-      return (!q||values.includes(q)) && (filter==='all'||(mode==='short'?practice(x):'all')===filter);
+      return (!q||values.includes(q)) && (filter==='all'||(mode==='short'?practice(x):mode==='analysis'?(x.status||'待用'):'all')===filter);
     }).sort((a,b)=>String(b.updated||b.created).localeCompare(String(a.updated||a.created)));
-    return `<section class="list-pane"><div class="creative-list-actions"><button class="btn primary big" data-action="new">＋ 新建${mode==='short'?'短线':'长线'}</button>${mode==='short'?'<button class="btn" data-action="pasteCase">📋 粘贴案例</button>':''}</div>
-      <div class="creative-search"><input id="creativeSearch" type="search" placeholder="搜索标题、内容、结构、状态…" value="${E(search)}"><select id="creativeFilter" aria-label="按状态筛选"><option value="all">全部状态</option>${mode==='short'?options(statuses,filter):''}</select></div>
-      <div class="list-head">${mode==='short'?'短线创作':'长线结构'} · ${items.length} 条</div><div class="list">${items.length?items.slice(0,visibleLimit).map(x=>`<div class="card ${selected===x.id?'selected':''}" data-select="${E(x.id)}"><div class="card-top"><span class="chip ${mode==='short'?'短线':'长线'}">${E(x.code)}</span><span>${E(mode==='short'?practice(x):'结构与方法')}</span>${mode==='short'&&x.column?`<span class="chip cw-column">${E(x.column)}</span>`:''}${mode==='short'&&x.desire?`<span class="chip cw-desire">${E(x.desire)}</span>`:''}<span class="date">${E((x.created||'').slice(0,10))}</span></div><div class="card-title">${E(x.title||x.url||'未命名记录')}</div>${mode==='short'&&x.structureId?`<div class="card-how">结构：${E(db.long.find(y=>y.id===x.structureId)?.title||'未找到')}</div>`:''}</div>`).join('')+(items.length>visibleLimit?`<button class="more" data-action="more">再显示 ${Math.min(100,items.length-visibleLimit)} 条</button>`:''):'<div class="empty-list">还没有符合条件的记录</div>'}</div></section>`;
+    return `<section class="list-pane"><div class="creative-list-actions"><button class="btn primary big" data-action="new">＋ 新建${mode==='short'?'短线':mode==='analysis'?'分析':'长线'}</button>${mode==='short'?'<button class="btn" data-action="pasteCase">📋 粘贴案例</button>':''}</div>
+      <div class="creative-search"><input id="creativeSearch" type="search" placeholder="搜索标题、内容、结构、状态…" value="${E(search)}"><select id="creativeFilter" aria-label="按状态筛选"><option value="all">全部状态</option>${mode==='short'?options(statuses,filter):mode==='analysis'?options(['待用','已用'],filter):''}</select></div>
+      <div class="list-head">${mode==='short'?'短线创作':mode==='analysis'?'分析':'长线结构'} · ${items.length} 条</div><div class="list">${items.length?items.slice(0,visibleLimit).map(x=>`<div class="card ${selected===x.id?'selected':''}" data-select="${E(x.id)}"><div class="card-top"><span class="chip ${mode==='short'?'短线':'长线'}">${E(x.code)}</span><span>${E(mode==='short'?practice(x):mode==='analysis'?(x.status||'待用'):'结构与方法')}</span>${mode==='short'&&x.column?`<span class="chip cw-column">${E(x.column)}</span>`:''}${mode==='short'&&x.desire?`<span class="chip cw-desire">${E(x.desire)}</span>`:''}<span class="date">${E((x.created||'').slice(0,10))}</span></div><div class="card-title">${E(x.title||x.url||'未命名记录')}</div>${mode==='short'&&x.structureId?`<div class="card-how">结构：${E(db.long.find(y=>y.id===x.structureId)?.title||'未找到')}</div>`:''}</div>`).join('')+(items.length>visibleLimit?`<button class="more" data-action="more">再显示 ${Math.min(100,items.length-visibleLimit)} 条</button>`:''):'<div class="empty-list">还没有符合条件的记录</div>'}</div></section>`;
   }
   // 旧字段只读转换为 Markdown，原始数据始终保留；首次保存新正文不会删除旧字段。
   function legacyBody(x,kind) {
@@ -257,14 +272,22 @@ ${topicTemplate}`;
     }
     return html;
   }
+  function analysisDetail(){
+    const body=draft.body||analysisTemplate, linked=db.short.find(x=>x.id===draft.shortId);
+    const editor=`<div class="editor cw-edit"><div class="field"><label>标题</label><input data-field="title" aria-label="标题" value="${E(draft.title||'')}"></div><div class="field"><label>链接（可选）</label><input data-field="url" aria-label="链接" value="${E(draft.url||'')}"></div><div class="field"><label>好在哪</label><textarea class="cw-markdown-input" data-field="body" aria-label="好在哪">${E(body)}</textarea></div><div class="field"><label>升级点（必填，一句话）</label><input data-field="upgrade" aria-label="升级点" value="${E(draft.upgrade||'')}"></div><div class="field"><label>状态</label><select data-field="status" aria-label="状态">${options(['待用','已用'],draft.status||'待用')}</select></div><div class="field"><label>用在了（可选）</label><select data-field="shortId" aria-label="用在了"><option value="">暂不关联</option>${db.short.map(x=>`<option value="${E(x.id)}" ${x.id===draft.shortId?'selected':''}>${E(x.code+'｜'+(x.title||'未命名'))}</option>`).join('')}</select><p class="creative-hint">关联短线并保存后，状态自动变为已用。</p></div></div><div class="creative-sticky"><button class="btn primary big" data-action="save">保存</button><button class="btn" data-action="cancelEdit">取消</button></div>`;
+    const view=`<div class="detail-toolbar"><button class="btn primary" data-action="edit">编辑</button><button class="btn" data-action="copy">复制 Markdown</button><span class="spacer"></span><button class="btn danger" data-action="delete">删除</button></div><div class="creative-heading"><span class="chip 长线">${E(draft.code)}</span><span class="chip ghost">${E(draft.status||'待用')}</span></div><h1 class="conclusion cw-title">${E(draft.title||'未命名')}</h1>${draft.url?`<div class="creative-hint cw-meta">链接：${/^https?:\/\//i.test(draft.url)?`<a href="${E(draft.url)}" target="_blank" rel="noopener noreferrer">${E(draft.url)}</a>`:E(draft.url)}</div>`:''}<p><strong>升级点：</strong>${E(draft.upgrade||'')}</p>${linked?`<p>用在了：${E(linked.code+'｜'+linked.title)}</p>`:''}<article class="creative-prose">${markdown(body)}</article>`;
+    return `<main class="detail-pane"><div class="detail cw-detail">${editing?editor:view}</div></main>`;
+  }
   function detail() {
-    if(!draft) return `<main class="detail-pane"><div class="creative-empty"><h2>把想法带到真实创作中</h2><p>选择一条记录阅读，或新建一条。</p><button class="btn primary big" data-action="new">＋ 新建${mode==='short'?'短线记录':'长线结构'}</button></div></main>`;
+    if(draft && mode==='analysis')return analysisDetail();
+    if(!draft) return `<main class="detail-pane"><div class="creative-empty"><h2>把想法带到真实创作中</h2><p>选择一条记录阅读，或新建一条。</p><button class="btn primary big" data-action="new">＋ 新建${mode==='short'?'短线记录':mode==='analysis'?'分析':'长线结构'}</button></div></main>`;
     const body=bodyOf(draft,mode), related=mode==='short'?db.long.find(x=>x.id===draft.structureId):null;
     const refs=mode==='long'?`<details class="creative-section"><summary>关联的短线作品（${db.short.filter(x=>x.structureId===draft.id).length}）</summary><div class="creative-links">${db.short.filter(x=>x.structureId===draft.id).map(x=>`<button class="btn" data-goto-short="${E(x.id)}">${E(x.code+'｜'+(x.title||'未命名'))}</button>`).join('')||'<span class="creative-hint">暂无关联作品。</span>'}</div></details>`:'';
+    const analysisEditor=mode==='short'?`<div class="field"><label>关联分析（可选）</label><select data-field="analysisId" aria-label="关联分析"><option value="">暂不关联</option>${db.analysis.map(a=>`<option value="${E(a.id)}" ${a.id===draft.analysisId?'selected':''}>${E((a.code||'')+'｜'+a.title+' · '+(a.status||'待用'))}</option>`).join('')}</select><p class="creative-hint">保存后分析自动标为已用。</p></div>`:'';
     const linkEditor=mode==='short'?`<div class="field"><label>关联长线结构（可选）</label><select data-field="structureId" aria-label="关联长线结构"><option value="">暂不关联</option>${db.long.map(x=>`<option value="${E(x.id)}" ${x.id===draft.structureId?'selected':''}>${E(x.code+'｜'+x.title)}</option>`).join('')}</select></div><button type="button" class="btn" data-action="newLinked">＋ 新建长线结构并关联</button>`:'';
     const hasLegacy = groups[mode].some(([, fields]) => fields.some(([k]) => !['title','url',...NEW_KEYS].includes(k) && draft[k] !== undefined && draft[k] !== null && String(draft[k]).trim() !== ''));
     const legacy=typeof draft.body==='string' && hasLegacy && legacyBody(draft,mode) ? `<details class="creative-section"><summary>查看 V1 原有字段（已保留）</summary><div class="creative-prose">${markdown(legacyBody(draft,mode))}</div></details>` : '';
-    const editHtml=`<div class="editor cw-edit"><div class="field"><label>标题</label><input data-field="title" aria-label="标题" value="${E(draft.title||'')}"></div>${mode==='short'?`<div class="field"><label>参考视频链接（可选）</label><input type="url" data-field="url" aria-label="参考视频链接" value="${E(draft.url||'')}"></div><div class="field"><label>状态</label><select data-field="practiceStatus" aria-label="状态">${options(statuses,practice(draft))}</select></div><div class="field"><label>栏目</label><select data-field="column" aria-label="栏目"><option value="">未选择</option>${options(COLUMNS,draft.column||'')}</select></div><details class="cw-optional" ${draft.desire||METRICS.some(([k])=>String(draft[k]??'').trim()!=='')?'open':''}><summary>可选：欲望标签与发布数据</summary><div class="field"><label>欲望标签（选一个）</label><select data-field="desire" aria-label="欲望标签"><option value="">未选择</option>${options(DESIRES,draft.desire||'')}</select></div><div class="field"><label>发布数据（发布后填）</label><div class="cw-metrics-input">${METRICS.map(([k,l])=>`<label class="cw-metric"><span>${l}</span><input type="number" min="0" step="1" inputmode="numeric" data-field="${k}" aria-label="${l}" value="${E(draft[k]??'')}"></label>`).join('')}</div></div></details>${linkEditor}`:''}<div class="field"><label class="cw-body-label"><span>Markdown 正文</span>${mode==='short'?`<span class="cw-tpl">换模板：${Object.entries(templates).map(([k,[n]])=>`<button type="button" class="btn" data-action="tpl" data-tpl="${k}">${n}</button>`).join('')}</span>`:''}</label><textarea class="cw-markdown-input" data-field="body" aria-label="Markdown 正文">${E(body)}</textarea></div></div><div class="creative-sticky"><button class="btn primary big" data-action="save">保存</button><button class="btn" data-action="cancelEdit">取消</button><span class="creative-hint">${dirty?'有未保存修改':'编辑中'}</span></div>`;
+    const editHtml=`<div class="editor cw-edit"><div class="field"><label>标题</label><input data-field="title" aria-label="标题" value="${E(draft.title||'')}"></div>${mode==='short'?`<div class="field"><label>参考视频链接（可选）</label><input type="url" data-field="url" aria-label="参考视频链接" value="${E(draft.url||'')}"></div><div class="field"><label>状态</label><select data-field="practiceStatus" aria-label="状态">${options(statuses,practice(draft))}</select></div><div class="field"><label>栏目</label><select data-field="column" aria-label="栏目"><option value="">未选择</option>${options(COLUMNS,draft.column||'')}</select></div><details class="cw-optional" ${draft.desire||METRICS.some(([k])=>String(draft[k]??'').trim()!=='')?'open':''}><summary>可选：欲望标签与发布数据</summary><div class="field"><label>欲望标签（选一个）</label><select data-field="desire" aria-label="欲望标签"><option value="">未选择</option>${options(DESIRES,draft.desire||'')}</select></div><div class="field"><label>发布数据（发布后填）</label><div class="cw-metrics-input">${METRICS.map(([k,l])=>`<label class="cw-metric"><span>${l}</span><input type="number" min="0" step="1" inputmode="numeric" data-field="${k}" aria-label="${l}" value="${E(draft[k]??'')}"></label>`).join('')}</div></div></details>${linkEditor}${analysisEditor}`:''}<div class="field"><label class="cw-body-label"><span>Markdown 正文</span>${mode==='short'?`<span class="cw-tpl">换模板：${Object.entries(templates).map(([k,[n]])=>`<button type="button" class="btn" data-action="tpl" data-tpl="${k}">${n}</button>`).join('')}</span>`:''}</label><textarea class="cw-markdown-input" data-field="body" aria-label="Markdown 正文">${E(body)}</textarea></div></div><div class="creative-sticky"><button class="btn primary big" data-action="save">保存</button><button class="btn" data-action="cancelEdit">取消</button><span class="creative-hint">${dirty?'有未保存修改':'编辑中'}</span></div>`;
     const viewHtml=`<div class="detail-toolbar"><button class="btn primary" data-action="edit">编辑</button><button class="btn" data-action="copy">复制 Markdown</button><span class="spacer"></span><button class="btn danger" data-action="delete">删除</button></div><div class="creative-heading"><span class="chip ${mode==='short'?'短线':'长线'}">${E(draft.code)}</span>${mode==='short'?`<span class="chip ghost">${E(practice(draft))}</span>${draft.column?`<span class="chip cw-column">${E(draft.column)}</span>`:''}${draft.desire?`<span class="chip cw-desire">${E(draft.desire)}</span>`:''}`:''}</div><h1 class="conclusion cw-title">${E(draft.title||'未命名记录')}</h1><div class="creative-hint cw-meta">创建：${E(localTime(draft.created))} · 修改：${E(localTime(draft.updated||draft.created))}</div>${mode==='short'&&metricsLine(draft)?`<div class="cw-metrics">${metricsLine(draft)}</div>`:''}${draft.url?`<div class="creative-hint cw-meta">参考链接：${/^https?:\/\//i.test(draft.url)?`<a href="${E(draft.url)}" target="_blank" rel="noopener noreferrer">${E(draft.url)}</a>`:E(draft.url)}</div>`:''}${related?`<div class="creative-hint cw-meta">关联结构：${E(related.code+'｜'+related.title)}</div>`:''}<article class="creative-prose">${markdown(body)}</article>${legacy}${refs}`;
     return `<main class="detail-pane"><div class="detail cw-detail">${editing?`<div class="creative-heading"><span class="chip ${mode==='short'?'短线':'长线'}">${E(draft.code)}</span><span class="creative-hint">${selected?'编辑记录':'新记录'}</span></div>${editHtml}`:viewHtml}</div></main>`;
   }
@@ -325,30 +348,31 @@ ${topicTemplate}`;
     m.querySelector('#casePasteApply').addEventListener('click',applyCase);
   }
   async function copyBody(){
-    const value=bodyOf(draft,mode);
+    const value=mode==='analysis' ? `# ${draft.title||''}\n\n升级点：${draft.upgrade||''}\n状态：${draft.status||'待用'}\n\n${draft.body||''}` : bodyOf(draft,mode);
     try{await navigator.clipboard.writeText(value);notice('已复制 Markdown');}
     catch(_){openModal(`<h3>复制 Markdown</h3><div class="sub">浏览器未允许自动复制，请手动全选复制。</div><textarea class="capture" readonly>${E(value)}</textarea><div class="actions"><button class="btn" id="cwCopyClose">关闭</button></div>`);document.getElementById('cwCopyClose').addEventListener('click',closeModal);}
   }
   // 选择的是已保存记录；筛选只影响列表，不会取消其他已选项。
   function openSelectedExport(){
     const chosen=new Set();
-    const saved=[...db.short.map(x=>({kind:'short',item:x})),...db.long.map(x=>({kind:'long',item:x}))];
+    const saved=[...db.short.map(x=>({kind:'short',item:x})),...db.long.map(x=>({kind:'long',item:x})),...db.analysis.map(x=>({kind:'analysis',item:x}))];
     const idOf=x=>x.kind+':'+x.item.id;
     const dateOf=value=>{const d=new Date(value);if(!value||Number.isNaN(d.getTime()))return '';return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
     const m=openModal(`<h3>选择性导出</h3><div class="sub">选出要交给 AI 的创作记录。导出为 Markdown 文本；只包含已保存内容，不会修改原记录。${dirty?'当前编辑尚未保存，不会包含在导出中。':''}</div>
-      <div class="cw-export-filters"><label>类型<select id="ceKind"><option value="all">全部类型</option><option value="short">短线案例</option><option value="long">长线结构</option></select></label><label>搜索<input id="ceSearch" type="search" placeholder="标题、内容、编号…"></label><label>创建日期从<input id="ceStart" type="date"></label><label>到<input id="ceEnd" type="date"></label></div>
+      <div class="cw-export-filters"><label>类型<select id="ceKind"><option value="all">全部类型</option><option value="short">短线案例</option><option value="long">长线结构</option><option value="analysis">分析</option></select></label><label>搜索<input id="ceSearch" type="search" placeholder="标题、内容、编号…"></label><label>创建日期从<input id="ceStart" type="date"></label><label>到<input id="ceEnd" type="date"></label></div>
       <div class="row"><button class="btn" id="ceAll">全选当前筛选</button><button class="btn" id="ceClear">清空选择</button><span class="creative-hint" id="ceCount"></span></div>
       <div class="cw-export-list" id="ceList"></div><div class="sub-title" style="margin-top:14px">导出内容预览</div><textarea id="cePreview" aria-label="导出内容预览" readonly style="min-height:150px" placeholder="请先勾选要导出的记录"></textarea>
       <div class="actions"><button class="btn" id="ceClose">关闭</button><button class="btn" id="ceDownload" disabled>下载 Markdown</button><button class="btn primary" id="ceCopy" disabled>复制给 AI</button></div>`,{wide:true});
     const q=id=>m.querySelector(id), listEl=q('#ceList'),preview=q('#cePreview');
     function filteredExport(){
       const kind=q('#ceKind').value,query=q('#ceSearch').value.trim().toLowerCase(),start=q('#ceStart').value,end=q('#ceEnd').value;
-      return saved.filter(({kind:k,item:x})=>{const date=dateOf(x.created),hay=[x.code,x.title,x.url,bodyOf(x,k),k==='short'?'短线':'长线',k==='short'?practice(x):''].join('\n').toLowerCase();return (kind==='all'||kind===k)&&(!query||hay.includes(query))&&(!start||(date&&date>=start))&&(!end||(date&&date<=end));});
+      return saved.filter(({kind:k,item:x})=>{const date=dateOf(x.created),hay=[x.code,x.title,x.url,k==='analysis'?`${x.body||''} ${x.upgrade||''} ${x.status||''}`:bodyOf(x,k),k==='short'?'短线':k==='analysis'?'分析':'长线',k==='short'?practice(x):''].join('\n').toLowerCase();return (kind==='all'||kind===k)&&(!query||hay.includes(query))&&(!start||(date&&date>=start))&&(!end||(date&&date<=end));});
     }
     function output(){
       const records=saved.filter(x=>chosen.has(idOf(x)));
       return records.map(({kind,item:x})=>{
         const rel=kind==='short'?db.long.find(y=>y.id===x.structureId):null;
+        if(kind==='analysis'){const linked=db.short.find(y=>y.id===x.shortId);return [`# ${x.code||''}｜${(x.title||'未命名').replace(/[\r\n]+/g,' ')}`,`类型：分析\n状态：${x.status||'待用'}\n升级点：${x.upgrade||''}${x.url?'\n链接：'+x.url:''}${linked?'\n用在了：'+linked.code+'｜'+linked.title:''}`,x.body||''].join('\n\n');}
         const heading=`# ${x.code||''}｜${(x.title||'未命名').replace(/[\r\n]+/g,' ')}`;
         const meta=[`类型：${kind==='short'?'短线案例':'长线结构'}`,kind==='short'?`状态：${practice(x)}`:'',kind==='short'&&x.column?`栏目：${x.column}`:'',kind==='short'&&x.desire?`欲望标签：${x.desire}`:'',kind==='short'&&METRICS.some(([k])=>String(x[k]??'').trim()!=='')?'发布数据：'+METRICS.filter(([k])=>String(x[k]??'').trim()!=='').map(([k,l])=>`${l} ${x[k]}`).join('，'):'',x.url?`参考链接：${x.url}`:'',rel?`关联结构：${rel.code}｜${rel.title}`:'',x.created?`创建日期：${dateOf(x.created)}`:''].filter(Boolean).join('\n');
         const legacy=typeof x.body==='string' && groups[kind].some(([,fields])=>fields.some(([k])=>!['title','url',...NEW_KEYS].includes(k)&&x[k]!==undefined&&x[k]!==null&&String(x[k]).trim()!=='')) ? legacyBody(x,kind) : '';
@@ -356,7 +380,7 @@ ${topicTemplate}`;
       }).join('\n\n---\n\n');
     }
     function updatePreview(){q('#ceCount').textContent=`已选择 ${chosen.size} 条`;preview.value=output();q('#ceCopy').disabled=!chosen.size;q('#ceDownload').disabled=!chosen.size;}
-    function draw(){const items=filteredExport();listEl.innerHTML=items.length?items.map(({kind,item:x})=>`<label class="cw-export-row"><input type="checkbox" data-export-kind="${kind}" data-export-id="${E(x.id)}" ${chosen.has(kind+':'+x.id)?'checked':''}><span><b>${E(x.code||'')}｜${E(x.title||'未命名')}</b><small>${kind==='short'?'短线 · '+E(practice(x)):'长线结构'}${x.created?' · '+E(dateOf(x.created)):''}</small></span></label>`).join(''):'<div class="empty-list">没有符合筛选条件的记录</div>';updatePreview();}
+    function draw(){const items=filteredExport();listEl.innerHTML=items.length?items.map(({kind,item:x})=>`<label class="cw-export-row"><input type="checkbox" data-export-kind="${kind}" data-export-id="${E(x.id)}" ${chosen.has(kind+':'+x.id)?'checked':''}><span><b>${E(x.code||'')}｜${E(x.title||'未命名')}</b><small>${kind==='short'?'短线 · '+E(practice(x)):kind==='analysis'?'分析 · '+E(x.status||'待用'):'长线结构'}${x.created?' · '+E(dateOf(x.created)):''}</small></span></label>`).join(''):'<div class="empty-list">没有符合筛选条件的记录</div>';updatePreview();}
     listEl.addEventListener('change',e=>{const t=e.target;if(t.dataset.exportId){const id=t.dataset.exportKind+':'+t.dataset.exportId;if(t.checked)chosen.add(id);else chosen.delete(id);updatePreview();}});
     for(const id of ['#ceKind','#ceSearch','#ceStart','#ceEnd'])q(id).addEventListener(id==='#ceSearch'?'input':'change',draw);
     q('#ceAll').addEventListener('click',()=>{filteredExport().forEach(x=>chosen.add(idOf(x)));draw();});
@@ -368,12 +392,12 @@ ${topicTemplate}`;
   }
   function download() {const blob=new Blob([JSON.stringify({app:'creation-workbench',exportedAt:new Date().toISOString(),data:db},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='创作工作台备份-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);notice('已开始下载创作备份');}
   function restore(obj) {
-    if(obj?.app!=='creation-workbench'||!obj.data||obj.data.version!==1||!Array.isArray(obj.data.short)||!Array.isArray(obj.data.long))throw Error('请选择创作工作台的备份文件');
+    if(obj?.app!=='creation-workbench'||!obj.data||obj.data.version!==1||!Array.isArray(obj.data.short)||!Array.isArray(obj.data.long)||(obj.data.analysis!==undefined&&!Array.isArray(obj.data.analysis)))throw Error('请选择创作工作台的备份文件');
     const next=clone(db);let added=0;
-    for(const kind of ['long','short']) for(const item of obj.data[kind]) {
+    for(const kind of ['long','short','analysis']) for(const item of (obj.data[kind]||[])) {
       if(!item || typeof item.id!=='string' || typeof item.code!=='string') throw Error('备份中存在无效记录');
-      if(next.short.some(x=>x.id===item.id)||next.long.some(x=>x.id===item.id))continue;
-      const copy=clone(item), key=kind==='short'?'nextC':'nextS', prefix=kind==='short'?'C':'S';
+      if(['short','long','analysis'].some(k=>next[k].some(x=>x.id===item.id)))continue;
+      const copy=clone(item), key=kind==='short'?'nextC':kind==='long'?'nextS':'nextA', prefix=kind==='short'?'C':kind==='long'?'S':'A';
       if(!new RegExp('^'+prefix+'[0-9]+$').test(copy.code) || next[kind].some(x=>x.code===copy.code)) {copy.code=code(prefix,next[key]||1);while(next[kind].some(x=>x.code===copy.code))copy.code=code(prefix,++next[key]);}
       next[key]=Math.max(next[key]||1,Number(copy.code.slice(1))+1);next[kind].push(copy);added++;
     }

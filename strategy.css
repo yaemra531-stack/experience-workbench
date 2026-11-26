@@ -74,3 +74,9 @@
   .ns-columns { grid-template-columns: 1fr; }
   .ns-cols { grid-template-columns: 1fr; }
 }
+.ns-upgrade { display:block; margin-top:6px; color:var(--ink-2); line-height:1.45; overflow-wrap:anywhere; }
+.ns-upgrade strong { display:block; color:var(--long); }
+.ns-time-wrap { overflow-x:auto; }
+.ns-time { width:100%; border-collapse:collapse; text-align:left; font-size:14px; }
+.ns-time th,.ns-time td { padding:8px; border-bottom:1px solid var(--line); vertical-align:top; }
+.ns-time td:first-child { white-space:nowrap; }
