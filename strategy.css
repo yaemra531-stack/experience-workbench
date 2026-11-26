@@ -6,6 +6,9 @@
 .ns-label { font-size: 11px; letter-spacing: 1px; color: var(--ink-3); font-weight: 600; }
 .ns-mini { font-family: var(--serif); font-weight: 700; font-size: 13px; color: var(--ink); line-height: 1.5; }
 .ns-mini span { white-space: nowrap; }
+.ns-today { font-family: var(--serif); font-weight: 700; font-size: 15px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.ns-today b { font-size: 20px; color: var(--short); }
+.ns-today.hit b { color: var(--ok); }
 .ns-bar { display: block; height: 4px; border-radius: 99px; background: var(--panel-2); overflow: hidden; }
 .ns-bar i { display: block; height: 100%; min-width: 3px; background: var(--short); border-radius: inherit; transition: width .6s cubic-bezier(.2,.8,.2,1); }
 .ns-bar.big { height: 8px; }
@@ -30,6 +33,13 @@
 .ns-times { align-self: center; font-size: 20px; font-weight: 300; color: var(--ink-3); }
 .ns-note { margin: 10px 0 0; font-size: 13.5px; color: var(--ink-2); }
 
+.ns-columns { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.ns-column { display: flex; flex-direction: column; gap: 3px; background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--short); border-radius: 12px; padding: 12px 14px; }
+.ns-column-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.ns-column-head b { font-family: var(--serif); font-size: 19px; color: var(--ink); }
+.ns-column-head span { font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.ns-column-len { font-size: 13px; color: var(--short); font-weight: 600; }
+.ns-column em { font-style: normal; font-size: 13px; color: var(--ink-2); }
 .ns-desires { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .ns-desire { display: flex; flex-direction: column; gap: 2px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; }
 .ns-desire b { font-family: var(--serif); font-size: 18px; color: var(--short); }
@@ -61,5 +71,6 @@
   .ns-board { padding: 24px 20px; }
   .ns-title { font-size: 24px; }
   .ns-desires { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ns-columns { grid-template-columns: 1fr; }
   .ns-cols { grid-template-columns: 1fr; }
 }

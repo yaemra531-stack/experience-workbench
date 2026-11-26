@@ -64,14 +64,52 @@
 - **为什么会收藏：**
 - **需要实测：**
 - **当前判断：** 待实践。`;
-  const templates = { topic: ['选题', topicTemplate], case: ['拆案例', shortTemplate] };
+  // 新东西上手模板（15～30 秒）
+  const tryoutTemplate = `## 一、新东西
+
+- **是什么：**（哪家、什么模型或功能、哪天出的）
+- **链接：**
+
+## 二、我试了什么
+
+> （用了哪句话或哪个操作）
+
+## 三、15～30 秒怎么拍
+
+- **开头一句：**
+- **展示：**（最惊艳的那一下）
+- **一句评价：**
+
+## 四、注意
+
+- **普通人能不能用：**（免费 / 付费 / 地区限制）
+- **当前判断：** 待实践。`;
+  // 想法观察模板（约 15 秒）
+  const ideaTemplate = `## 一、一句话观点
+
+## 二、怎么想到的
+
+（哪次使用、哪条评论、哪个新闻）
+
+## 三、15 秒怎么说
+
+- **开头：**
+- **展开：**
+- **收尾：**
+
+- **当前判断：** 待实践。`;
+  const templates = { topic: ['解法', topicTemplate], tryout: ['上手', tryoutTemplate], idea: ['想法', ideaTemplate], case: ['拆案例', shortTemplate] };
+  // 栏目：名称要和战略看板 strategy.js 里的栏目一致
+  const COLUMNS = ['想法观察', '新东西上手', '痛点解法', '其他'];
+  const COLUMN_TEMPLATE = { '痛点解法': 'topic', '新东西上手': 'tryout', '想法观察': 'idea' };
   const DESIRES = ['懒', '怕', '贪', '面子', '爽好奇', '被说中'];
   const METRICS = [['views','播放'],['favorites','收藏'],['follows','关注']];
   // 这些字段由新界面直接编辑，不再算作「V1 原有字段」
-  const NEW_KEYS = ['desire','views','favorites','follows'];
+  const NEW_KEYS = ['column','practicedAt','desire','views','favorites','follows'];
   const importFormat = `标题：填写选题钩子
 参考视频链接：
 状态：待实践
+栏目：痛点解法 / 新东西上手 / 想法观察（选一个）
 欲望标签：懒 / 怕 / 贪 / 面子 / 爽好奇 / 被说中（选一个）
 正文：
 ${topicTemplate}`;
@@ -114,7 +152,7 @@ ${topicTemplate}`;
   function list() { return db[mode]; }
   function askLeave() { return !dirty || confirm('当前修改还没有保存，确定放弃吗？'); }
   function switchMode(next) { if (!askLeave()) return; mode=next; selected=null; draft=null; editing=false; dirty=false; returnDraft=null; search='';filter='all';visibleLimit=100;render(); }
-  function newDraft(kind=mode) { return {id:uid(),code:'保存后生成',created:new Date().toISOString(),updated:new Date().toISOString(),title:'', ...(kind==='short'?{practiceStatus:'待实践',structureId:'',desire:'',body:topicTemplate}:{body:longTemplate})}; }
+  function newDraft(kind=mode) { return {id:uid(),code:'保存后生成',created:new Date().toISOString(),updated:new Date().toISOString(),title:'', ...(kind==='short'?{practiceStatus:'待实践',structureId:'',column:'',desire:'',body:topicTemplate}:{body:longTemplate})}; }
   // 切换正文模板：正文是空的或还是某个模板原样时直接换；写过内容就先确认
   function useTemplate(key) {
     if(!draft||mode!=='short'||!templates[key])return;
@@ -135,6 +173,8 @@ ${topicTemplate}`;
     if (mode==='short' && !String(draft.title||'').trim() && !String(draft.url||'').trim() && !String(draft.transcript||'').trim()) {notice('请填写标题或参考视频链接',true);return;}
     if(mode==='long'&&!String(draft.title||'').trim()){notice('请填写结构或方法名称',true);return;}
     const next=clone(db), entry=clone(draft), idx=next[mode].findIndex(x=>x.id===entry.id);
+    // 记下第一次标为「已实践」的时间，战略看板用它算「今天已实践几条」
+    if(mode==='short'){ if(practice(entry)==='已实践'){ if(!entry.practicedAt && (idx<0 || practice(next.short[idx])!=='已实践')) entry.practicedAt=new Date().toISOString(); } else delete entry.practicedAt; }
     if(idx<0) {const k=mode==='short'?'nextC':'nextS';entry.code=code(mode==='short'?'C':'S',next[k]||1);next[k]=(next[k]||1)+1;next[mode].push(entry);} else next[mode][idx]=entry;
     entry.updated=new Date().toISOString();
     if(!commit(next))return;
@@ -183,7 +223,7 @@ ${topicTemplate}`;
     }).sort((a,b)=>String(b.updated||b.created).localeCompare(String(a.updated||a.created)));
     return `<section class="list-pane"><div class="creative-list-actions"><button class="btn primary big" data-action="new">＋ 新建${mode==='short'?'短线':'长线'}</button>${mode==='short'?'<button class="btn" data-action="pasteCase">📋 粘贴案例</button>':''}</div>
       <div class="creative-search"><input id="creativeSearch" type="search" placeholder="搜索标题、内容、结构、状态…" value="${E(search)}"><select id="creativeFilter" aria-label="按状态筛选"><option value="all">全部状态</option>${mode==='short'?options(statuses,filter):''}</select></div>
-      <div class="list-head">${mode==='short'?'短线创作':'长线结构'} · ${items.length} 条</div><div class="list">${items.length?items.slice(0,visibleLimit).map(x=>`<div class="card ${selected===x.id?'selected':''}" data-select="${E(x.id)}"><div class="card-top"><span class="chip ${mode==='short'?'短线':'长线'}">${E(x.code)}</span><span>${E(mode==='short'?practice(x):'结构与方法')}</span>${mode==='short'&&x.desire?`<span class="chip cw-desire">${E(x.desire)}</span>`:''}<span class="date">${E((x.created||'').slice(0,10))}</span></div><div class="card-title">${E(x.title||x.url||'未命名记录')}</div>${mode==='short'&&x.structureId?`<div class="card-how">结构：${E(db.long.find(y=>y.id===x.structureId)?.title||'未找到')}</div>`:''}</div>`).join('')+(items.length>visibleLimit?`<button class="more" data-action="more">再显示 ${Math.min(100,items.length-visibleLimit)} 条</button>`:''):'<div class="empty-list">还没有符合条件的记录</div>'}</div></section>`;
+      <div class="list-head">${mode==='short'?'短线创作':'长线结构'} · ${items.length} 条</div><div class="list">${items.length?items.slice(0,visibleLimit).map(x=>`<div class="card ${selected===x.id?'selected':''}" data-select="${E(x.id)}"><div class="card-top"><span class="chip ${mode==='short'?'短线':'长线'}">${E(x.code)}</span><span>${E(mode==='short'?practice(x):'结构与方法')}</span>${mode==='short'&&x.column?`<span class="chip cw-column">${E(x.column)}</span>`:''}${mode==='short'&&x.desire?`<span class="chip cw-desire">${E(x.desire)}</span>`:''}<span class="date">${E((x.created||'').slice(0,10))}</span></div><div class="card-title">${E(x.title||x.url||'未命名记录')}</div>${mode==='short'&&x.structureId?`<div class="card-how">结构：${E(db.long.find(y=>y.id===x.structureId)?.title||'未找到')}</div>`:''}</div>`).join('')+(items.length>visibleLimit?`<button class="more" data-action="more">再显示 ${Math.min(100,items.length-visibleLimit)} 条</button>`:''):'<div class="empty-list">还没有符合条件的记录</div>'}</div></section>`;
   }
   // 旧字段只读转换为 Markdown，原始数据始终保留；首次保存新正文不会删除旧字段。
   function legacyBody(x,kind) {
@@ -224,8 +264,8 @@ ${topicTemplate}`;
     const linkEditor=mode==='short'?`<div class="field"><label>关联长线结构（可选）</label><select data-field="structureId" aria-label="关联长线结构"><option value="">暂不关联</option>${db.long.map(x=>`<option value="${E(x.id)}" ${x.id===draft.structureId?'selected':''}>${E(x.code+'｜'+x.title)}</option>`).join('')}</select></div><button type="button" class="btn" data-action="newLinked">＋ 新建长线结构并关联</button>`:'';
     const hasLegacy = groups[mode].some(([, fields]) => fields.some(([k]) => !['title','url',...NEW_KEYS].includes(k) && draft[k] !== undefined && draft[k] !== null && String(draft[k]).trim() !== ''));
     const legacy=typeof draft.body==='string' && hasLegacy && legacyBody(draft,mode) ? `<details class="creative-section"><summary>查看 V1 原有字段（已保留）</summary><div class="creative-prose">${markdown(legacyBody(draft,mode))}</div></details>` : '';
-    const editHtml=`<div class="editor cw-edit"><div class="field"><label>标题</label><input data-field="title" aria-label="标题" value="${E(draft.title||'')}"></div>${mode==='short'?`<div class="field"><label>参考视频链接（可选）</label><input type="url" data-field="url" aria-label="参考视频链接" value="${E(draft.url||'')}"></div><div class="field"><label>状态</label><select data-field="practiceStatus" aria-label="状态">${options(statuses,practice(draft))}</select></div><div class="field"><label>欲望标签（选一个）</label><select data-field="desire" aria-label="欲望标签"><option value="">未选择</option>${options(DESIRES,draft.desire||'')}</select></div><div class="field"><label>发布数据（发布后填）</label><div class="cw-metrics-input">${METRICS.map(([k,l])=>`<label class="cw-metric"><span>${l}</span><input type="number" min="0" step="1" inputmode="numeric" data-field="${k}" aria-label="${l}" value="${E(draft[k]??'')}"></label>`).join('')}</div></div>${linkEditor}`:''}<div class="field"><label class="cw-body-label"><span>Markdown 正文</span>${mode==='short'?`<span class="cw-tpl">换模板：${Object.entries(templates).map(([k,[n]])=>`<button type="button" class="btn" data-action="tpl" data-tpl="${k}">${n}</button>`).join('')}</span>`:''}</label><textarea class="cw-markdown-input" data-field="body" aria-label="Markdown 正文">${E(body)}</textarea></div></div><div class="creative-sticky"><button class="btn primary big" data-action="save">保存</button><button class="btn" data-action="cancelEdit">取消</button><span class="creative-hint">${dirty?'有未保存修改':'编辑中'}</span></div>`;
-    const viewHtml=`<div class="detail-toolbar"><button class="btn primary" data-action="edit">编辑</button><button class="btn" data-action="copy">复制 Markdown</button><span class="spacer"></span><button class="btn danger" data-action="delete">删除</button></div><div class="creative-heading"><span class="chip ${mode==='short'?'短线':'长线'}">${E(draft.code)}</span>${mode==='short'?`<span class="chip ghost">${E(practice(draft))}</span>${draft.desire?`<span class="chip cw-desire">${E(draft.desire)}</span>`:''}`:''}</div><h1 class="conclusion cw-title">${E(draft.title||'未命名记录')}</h1><div class="creative-hint cw-meta">创建：${E(localTime(draft.created))} · 修改：${E(localTime(draft.updated||draft.created))}</div>${mode==='short'&&metricsLine(draft)?`<div class="cw-metrics">${metricsLine(draft)}</div>`:''}${draft.url?`<div class="creative-hint cw-meta">参考链接：${/^https?:\/\//i.test(draft.url)?`<a href="${E(draft.url)}" target="_blank" rel="noopener noreferrer">${E(draft.url)}</a>`:E(draft.url)}</div>`:''}${related?`<div class="creative-hint cw-meta">关联结构：${E(related.code+'｜'+related.title)}</div>`:''}<article class="creative-prose">${markdown(body)}</article>${legacy}${refs}`;
+    const editHtml=`<div class="editor cw-edit"><div class="field"><label>标题</label><input data-field="title" aria-label="标题" value="${E(draft.title||'')}"></div>${mode==='short'?`<div class="field"><label>参考视频链接（可选）</label><input type="url" data-field="url" aria-label="参考视频链接" value="${E(draft.url||'')}"></div><div class="field"><label>状态</label><select data-field="practiceStatus" aria-label="状态">${options(statuses,practice(draft))}</select></div><div class="field"><label>栏目</label><select data-field="column" aria-label="栏目"><option value="">未选择</option>${options(COLUMNS,draft.column||'')}</select></div><details class="cw-optional" ${draft.desire||METRICS.some(([k])=>String(draft[k]??'').trim()!=='')?'open':''}><summary>可选：欲望标签与发布数据</summary><div class="field"><label>欲望标签（选一个）</label><select data-field="desire" aria-label="欲望标签"><option value="">未选择</option>${options(DESIRES,draft.desire||'')}</select></div><div class="field"><label>发布数据（发布后填）</label><div class="cw-metrics-input">${METRICS.map(([k,l])=>`<label class="cw-metric"><span>${l}</span><input type="number" min="0" step="1" inputmode="numeric" data-field="${k}" aria-label="${l}" value="${E(draft[k]??'')}"></label>`).join('')}</div></div></details>${linkEditor}`:''}<div class="field"><label class="cw-body-label"><span>Markdown 正文</span>${mode==='short'?`<span class="cw-tpl">换模板：${Object.entries(templates).map(([k,[n]])=>`<button type="button" class="btn" data-action="tpl" data-tpl="${k}">${n}</button>`).join('')}</span>`:''}</label><textarea class="cw-markdown-input" data-field="body" aria-label="Markdown 正文">${E(body)}</textarea></div></div><div class="creative-sticky"><button class="btn primary big" data-action="save">保存</button><button class="btn" data-action="cancelEdit">取消</button><span class="creative-hint">${dirty?'有未保存修改':'编辑中'}</span></div>`;
+    const viewHtml=`<div class="detail-toolbar"><button class="btn primary" data-action="edit">编辑</button><button class="btn" data-action="copy">复制 Markdown</button><span class="spacer"></span><button class="btn danger" data-action="delete">删除</button></div><div class="creative-heading"><span class="chip ${mode==='short'?'短线':'长线'}">${E(draft.code)}</span>${mode==='short'?`<span class="chip ghost">${E(practice(draft))}</span>${draft.column?`<span class="chip cw-column">${E(draft.column)}</span>`:''}${draft.desire?`<span class="chip cw-desire">${E(draft.desire)}</span>`:''}`:''}</div><h1 class="conclusion cw-title">${E(draft.title||'未命名记录')}</h1><div class="creative-hint cw-meta">创建：${E(localTime(draft.created))} · 修改：${E(localTime(draft.updated||draft.created))}</div>${mode==='short'&&metricsLine(draft)?`<div class="cw-metrics">${metricsLine(draft)}</div>`:''}${draft.url?`<div class="creative-hint cw-meta">参考链接：${/^https?:\/\//i.test(draft.url)?`<a href="${E(draft.url)}" target="_blank" rel="noopener noreferrer">${E(draft.url)}</a>`:E(draft.url)}</div>`:''}${related?`<div class="creative-hint cw-meta">关联结构：${E(related.code+'｜'+related.title)}</div>`:''}<article class="creative-prose">${markdown(body)}</article>${legacy}${refs}`;
     return `<main class="detail-pane"><div class="detail cw-detail">${editing?`<div class="creative-heading"><span class="chip ${mode==='short'?'短线':'长线'}">${E(draft.code)}</span><span class="creative-hint">${selected?'编辑记录':'新记录'}</span></div>${editHtml}`:viewHtml}</div></main>`;
   }
   function render() { root.innerHTML=sidebar()+records()+detail(); }
@@ -233,7 +273,7 @@ ${topicTemplate}`;
   // 只识别正文开头的明确字段；未识别的内容全部保留在正文。
   function parseCase(text) {
     const lines=String(text||'').replace(/\r\n?/g,'\n').split('\n');
-    let title='',url='',status='待实践',desireText='',i=0;const prefix=[];
+    let title='',url='',status='待实践',desireText='',column='',i=0;const prefix=[];
     while(i<lines.length) {
       const line=lines[i], clean=line.trim(); let m;
       if(!clean){ if(prefix.length)prefix.push('');i++;continue; }
@@ -250,13 +290,14 @@ ${topicTemplate}`;
       }
       if((m=plain.match(/^状态\s*[：:]\s*(待实践|已实践)\s*$/))){status=m[1];i++;continue;}
       if((m=plain.match(/^欲望标签\s*[：:]\s*(.*)$/))){desireText=m[1];i++;continue;}
+      if((m=plain.match(/^栏目\s*[：:]\s*(.*)$/))){const c=m[1].trim();if(COLUMNS.includes(c))column=c;else prefix.push(line);i++;continue;}
       if((m=plain.match(/^状态\s*[：:]\s*$/))){i++;continue;}
       // 来源说明、时长等不是独立字段：原样并入正文。
       prefix.push(line);i++;
     }
     const body=[...prefix,...lines.slice(i)].join('\n').trim();
     if(!desireText){const bm=body.match(/欲望标签[^\n：:]*[：:][*\s]*([^\n]+)/);if(bm)desireText=bm[1];}
-    return {title,url,practiceStatus:status,desire:pickDesire(desireText),body};
+    return {title,url,practiceStatus:status,column,desire:pickDesire(desireText),body};
   }
   // 从「怕 + 被说中」这类文字里取第一个出现的欲望；模板占位（全部列出）不算
   function pickDesire(text) {
@@ -309,7 +350,7 @@ ${topicTemplate}`;
       return records.map(({kind,item:x})=>{
         const rel=kind==='short'?db.long.find(y=>y.id===x.structureId):null;
         const heading=`# ${x.code||''}｜${(x.title||'未命名').replace(/[\r\n]+/g,' ')}`;
-        const meta=[`类型：${kind==='short'?'短线案例':'长线结构'}`,kind==='short'?`状态：${practice(x)}`:'',kind==='short'&&x.desire?`欲望标签：${x.desire}`:'',kind==='short'&&METRICS.some(([k])=>String(x[k]??'').trim()!=='')?'发布数据：'+METRICS.filter(([k])=>String(x[k]??'').trim()!=='').map(([k,l])=>`${l} ${x[k]}`).join('，'):'',x.url?`参考链接：${x.url}`:'',rel?`关联结构：${rel.code}｜${rel.title}`:'',x.created?`创建日期：${dateOf(x.created)}`:''].filter(Boolean).join('\n');
+        const meta=[`类型：${kind==='short'?'短线案例':'长线结构'}`,kind==='short'?`状态：${practice(x)}`:'',kind==='short'&&x.column?`栏目：${x.column}`:'',kind==='short'&&x.desire?`欲望标签：${x.desire}`:'',kind==='short'&&METRICS.some(([k])=>String(x[k]??'').trim()!=='')?'发布数据：'+METRICS.filter(([k])=>String(x[k]??'').trim()!=='').map(([k,l])=>`${l} ${x[k]}`).join('，'):'',x.url?`参考链接：${x.url}`:'',rel?`关联结构：${rel.code}｜${rel.title}`:'',x.created?`创建日期：${dateOf(x.created)}`:''].filter(Boolean).join('\n');
         const legacy=typeof x.body==='string' && groups[kind].some(([,fields])=>fields.some(([k])=>!['title','url',...NEW_KEYS].includes(k)&&x[k]!==undefined&&x[k]!==null&&String(x[k]).trim()!=='')) ? legacyBody(x,kind) : '';
         return [heading,meta,bodyOf(x,kind),legacy?'## V1 原有字段（保留）\n\n'+legacy:''].filter(Boolean).join('\n\n');
       }).join('\n\n---\n\n');
@@ -340,6 +381,14 @@ ${topicTemplate}`;
   }
   document.getElementById('openCreative').addEventListener('click',()=>{ if(S.editing){saveDraft();} try {db=read();} catch(e) {toast('创作数据读取失败，请勿清除浏览器数据：'+e.message,true);return;} old.hidden=true;root.hidden=false;render();});
   root.addEventListener('input',e=>{if(e.target.dataset.field&&draft){draft[e.target.dataset.field]=e.target.value;dirty=true;const hint=$c('.creative-sticky .creative-hint');if(hint)hint.textContent='有未保存修改';} if(e.target.id==='creativeSearch'){search=e.target.value;visibleLimit=100;refreshList();}});
+  // 选栏目时：正文还没动过，就自动换成该栏目的模板；同时刷新「对照战略」提示
+  root.addEventListener('change',e=>{
+    if(e.target.dataset.field!=='column'||!draft||!editing||mode!=='short')return;
+    draft.column=e.target.value;dirty=true;
+    const key=COLUMN_TEMPLATE[draft.column], cur=String(draft.body??'').trim();
+    if(key && (!cur||Object.values(templates).some(([,t])=>t.trim()===cur))) draft.body=templates[key][1];
+    render();
+  });
   root.addEventListener('change',async e=>{if(e.target.id==='creativeFilter'){filter=e.target.value;visibleLimit=100;refreshList();} if(e.target.id==='creativeRestore' && e.target.files[0]){if(!askLeave())return;try{restore(JSON.parse(await e.target.files[0].text()));}catch(err){notice('导入失败：'+err.message,true);}}});
   root.addEventListener('click',e=>{
     const m=e.target.closest('[data-mode]');if(m){switchMode(m.dataset.mode);return;}
