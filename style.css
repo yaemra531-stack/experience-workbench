@@ -316,3 +316,12 @@ select.inline { border: 1px solid var(--line); background: var(--panel); border-
 .cw-export-row:last-child { border-bottom:0; } .cw-export-row input { margin-top:5px; } .cw-export-row span { flex:1; min-width:0; }
 .cw-export-row b { display:block; overflow-wrap:anywhere; } .cw-export-row small { color:var(--ink-3); }
 @media (max-width:700px) { .cw-export-filters { grid-template-columns:1fr 1fr; } }
+/* 欲望标签、发布数据、模板切换 */
+.chip.cw-desire { color: var(--short); background: var(--short-bg); }
+.cw-metrics { display: inline-block; margin: 0 0 14px; padding: 6px 12px; border-radius: 8px; background: var(--panel); border: 1px solid var(--line); font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.cw-metrics-input { display: flex; gap: 10px; flex-wrap: wrap; }
+.cw-edit .cw-metric { display: flex; flex-direction: column; gap: 4px; margin: 0; font-size: 12px; color: var(--ink-3); font-weight: 500; }
+.cw-metric input { width: 120px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); padding: 7px 10px; color: var(--ink); font-size: 14px; font-variant-numeric: tabular-nums; }
+.cw-edit .cw-body-label { display: flex !important; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.cw-tpl { display: inline-flex; align-items: center; gap: 6px; font-weight: 400; font-size: 12px; color: var(--ink-3); }
+.cw-tpl .btn { padding: 2px 10px; font-size: 12px; }
