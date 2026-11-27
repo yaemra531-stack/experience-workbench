@@ -5,6 +5,9 @@
 
   // ===== 战略内容（改这里）=====
   const STRATEGY = {
+    // 每周抓完作品后，手动更新发布总数和更新日期。
+    publishedCount: 22,
+    lastUpdated: '2026-11-27',
     name: '短线',                                  // 战略名
     goal: '一年 1000 次发布（视频和文章都算）',                  // 目标一句话
     target: 1000,                                   // 目标总条数
@@ -25,9 +28,9 @@
     ],
     daily: [
       ['30 分钟', '保底：录 1 条想法观察，发掉'],
-      ['1～1.5 小时', '第二条视频：新东西上手 / 盘点 / 痛点解法'],
-      ['1～1.5 小时', '分析加升级：拆一个好内容，马上照着做一条'],
-      ['晚上 1 小时', '写文章，当今天的复盘'],
+      ['1～1.5 小时', '第二条视频：新东西上手 / 盘点'],
+      ['1～1.5 小时', '深度内容：教程 / 深度测评 / 痛点解法（时间不够先砍这块）'],
+      ['晚上 1 小时', '写文章：拆解一条低粉爆款，找可迁移的点 + 今天的复盘'],
     ],
     desiresNote: '所有栏目通用：每条都要有一个让人停下来的理由。',
     desires: [
@@ -46,7 +49,7 @@
     ],
     formulaNote: '三项缺一不可。痛点是「人的麻烦」，不是「AI 的毛病」。场景优先：家人、健康、学习、穿搭、人际关系、情绪 ＞ 职场。',
     rules: [
-      '只看 OpenAI、Anthropic、DeepSeek 三家的产品',
+      '痛点解法只看 OpenAI、Anthropic、DeepSeek 三家；新东西上手看中美所有 AI 新产品',
       '开头用生活或工作场景 + 普通人的原话，不出现功能名和英文产品名',
       '要编程、装工具的玩法，改写成网页或 App 里点几下就能用的平替',
       '健康、法律、钱：定位为帮你看懂、帮你准备，不替代专业人士',
@@ -85,12 +88,9 @@
   }
 
   function cardHtml(p) {
-    const hit = p.todayDone >= STRATEGY.perDay;
     return `<button class="north-star" type="button" data-ns-open title="查看完整战略">
       <span class="ns-label">当前战略 · ${E(STRATEGY.name)}</span>
-      <span class="ns-today ${hit ? 'hit' : ''}">今天 <b>${p.todayDone}</b> / ${STRATEGY.perDay} 条</span>
-      <span class="ns-bar"><i style="width:${p.pct.toFixed(2)}%"></i></span>
-      <span class="ns-count">总计 <b>${p.done}</b> / ${STRATEGY.target} · 第 ${p.day} 天</span>${latestUpgrade()?`<span class="ns-upgrade"><strong>今天的升级点</strong> ${E(latestUpgrade())}</span>`:''}
+      <span class="ns-count">总计 <b>${E(STRATEGY.publishedCount)}</b> / ${STRATEGY.target}</span>${latestUpgrade()?`<span class="ns-upgrade"><strong>今天的升级点</strong> ${E(latestUpgrade())}</span>`:''}
     </button>`;
   }
 
@@ -103,10 +103,8 @@
 
         <section class="ns-sec ns-progress">
           <div class="ns-progress-head">
-            <span>今天已实践 <b>${p.todayDone}</b> / ${STRATEGY.perDay}</span>
-            <span>总计 ${p.done} / ${STRATEGY.target} · 第 ${p.day} 天 · 按一年节奏应到约 ${p.pace} 条</span>
+            <span>总计 ${E(STRATEGY.publishedCount)} / ${STRATEGY.target} · 每周更新一次 · 上次更新：${E(STRATEGY.lastUpdated)}</span>
           </div>
-          <div class="ns-bar big"><i style="width:${p.pct.toFixed(2)}%"></i></div>
         </section>
 
         <section class="ns-sec">
@@ -131,6 +129,7 @@
         </section>
 
         <section class="ns-sec"><h2>想法观察公式</h2><p>一件 AI 的事 + 真实反应 + 一句判断或一个问题</p></section>
+        <section class="ns-sec"><h2>新东西上手公式</h2><p>一个新奇玩意 + 亲手玩一遍 + 值得玩还是别浪费时间</p></section>
         <section class="ns-sec">
           <h2>${E(STRATEGY.formulaTitle)}</h2>
           <div class="ns-formula">${STRATEGY.formula.map(f => `<span class="ns-term"><b>${E(f.name)}</b><small>${E(f.sub)}</small></span>`).join('<span class="ns-times">×</span>')}</div>
