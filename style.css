@@ -334,3 +334,7 @@ select.inline { border: 1px solid var(--line); background: var(--panel); border-
 .cw-optional .field { margin: 10px 0 6px; }
 
 .reuse-code{position:relative}.reuse-code pre{padding-top:3em}.reuse-copy{position:absolute;top:8px;right:8px}
+
+.sop-body ol { padding-left: 1.6em; }
+.sop-body li { margin: .55em 0; }
+.sop-body li strong { font-weight: 700; }

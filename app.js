@@ -168,7 +168,7 @@ function inView(e, v) {
 function terms() { return S.q.trim().toLowerCase().split(/\s+/).filter(Boolean); }
 function matchQ(e, ts) {
   if (!ts.length) return true;
-  const hay = [e.conclusion, e.why, e.how, e.scene, e.reuse, e.system, e.raw, e.prompt, (e.tags || []).join(' '), e.source, e.source_file].join('\n').toLowerCase();
+  const hay = [e.conclusion, e.why, e.how, e.scene, e.sop, e.reuse, e.system, e.raw, e.prompt, (e.tags || []).join(' '), e.source, e.source_file].join('\n').toLowerCase();
   return ts.every((t) => hay.includes(t));
 }
 function filtered() {
@@ -349,6 +349,7 @@ function renderDetail() {
     <div class="meta">${meta}</div>
     ${e.status === 'inbox' ? '' : block('why', '属于哪个系统，为什么', e.why, 'why', '补充分类原因')}
     ${e.status === 'inbox' ? '' : block('how', '应用场景', e.scene, 'scene', '补充应用场景')}
+    ${e.status !== 'inbox' && e.sop ? `<div class="block how"><div class="block-label">SOP</div><div class="block-body sop-body">${sopMd(e.sop)}</div></div>` : ''}
     ${e.status === 'inbox' ? '' : `<div class="block how"><div class="block-label">快速复用</div><div class="block-body">${e.reuse ? reuseMd(e.reuse) : '<span class="missing" data-fill="reuse">＋ 补充快速复用</span>'}</div></div>`}
     ${e.how ? block('how', '旧版做法', e.how, 'how', '') : ''}
     ${e.raw ? `<details class="raw" ${e.status === 'inbox' || !e.conclusion || (ts.length && matchQ({ conclusion: e.raw, tags: [] }, ts)) ? 'open' : ''}><summary>原始记录</summary><div class="block-body">${ts.length ? hlMd(e.raw, ts) : md(e.raw)}</div></details>` : ''}
@@ -356,6 +357,9 @@ function renderDetail() {
     ${simHtml}${histHtml}
   </div>`;
   if (fresh) $('.detail', el).classList.add('rise');
+}
+function sopMd(text) {
+  return md(String(text).replace(/^(\s*\d+[.)、]\s+)(?!\*\*)([^：:\n]{1,50})([：:])/gm, '$1**$2**$3'));
 }
 function reuseMd(text) {
   const div = document.createElement('div'); div.innerHTML = md(text);
@@ -422,7 +426,7 @@ function startEdit(id, focusField) {
     id: e?.id || null,
     focus: focusField || (e && !e.conclusion ? 'conclusion' : null),
     draft: {
-      type: e?.type || '短线', system: e?.system || '', scene: e?.scene || '', reuse: e?.reuse || '', conclusion: e?.conclusion || '', why: e?.why || '', how: e?.how || '',
+      type: e?.type || '短线', system: e?.system || '', scene: e?.scene || '', sop: e?.sop || '', reuse: e?.reuse || '', conclusion: e?.conclusion || '', why: e?.why || '', how: e?.how || '',
       raw: e?.raw || '', prompt: e?.prompt || '', tags: [...(e?.tags || [])], source: e?.source || '',
     },
   };
@@ -447,6 +451,7 @@ function editorHtml() {
     <div class="field"><label>属于哪个系统，为什么 <span class="hint">依据、经历、当时的情境</span></label>
       <textarea id="fWhy" placeholder="是什么让你得出这个结论？">${esc(d.why)}</textarea></div>
     <div class="field"><label>应用场景</label><textarea id="fScene">${esc(d.scene || '')}</textarea></div>
+    <div class="field"><label>SOP <span class="hint">选填</span></label><textarea id="fSop">${esc(d.sop || '')}</textarea></div>
     <div class="field"><label>快速复用</label><textarea id="fReuse">${esc(d.reuse || '')}</textarea></div>
     <div class="field" ${d.how ? '' : 'hidden'}><label>旧版做法</label><textarea id="fHow">${esc(d.how)}</textarea></div>
     <div class="field"><label>原始记录 <span class="hint">保留原话，不会被改写</span></label>
@@ -476,7 +481,7 @@ let lastFocusField = 'fConclusion';
 function bindEditor() {
   const d = S.editing.draft;
   const bind = (id, key) => { const el = $('#' + id); el.addEventListener('input', () => { d[key] = el.value; saveDraft(); if (key !== 'raw') updateEditSims(); }); el.addEventListener('focus', () => { lastFocusField = id; }); };
-  bind('fConclusion', 'conclusion'); bind('fWhy', 'why'); bind('fScene', 'scene'); bind('fReuse', 'reuse'); bind('fHow', 'how'); bind('fRaw', 'raw'); bind('fPrompt', 'prompt');
+  bind('fConclusion', 'conclusion'); bind('fWhy', 'why'); bind('fScene', 'scene'); bind('fSop', 'sop'); bind('fReuse', 'reuse'); bind('fHow', 'how'); bind('fRaw', 'raw'); bind('fPrompt', 'prompt');
   const cl = () => { const n = d.conclusion.length; $('#cLen').textContent = n ? `${n} 字${n > 50 ? ' · 试试更短一点' : ''}` : ''; };
   $('#fConclusion').addEventListener('input', cl); cl();
   $('#fSource').addEventListener('input', ev => { d.source = ev.target.value; saveDraft(); });
@@ -496,13 +501,13 @@ function bindEditor() {
   tagIn.addEventListener('change', addTag);
   $$('[data-rmtag]').forEach((b) => b.addEventListener('click', () => { d.tags = d.tags.filter((t) => t !== b.dataset.rmtag); saveDraft(); refreshEditorKeep(); }));
   $$('#rawHelper .s').forEach((s) => s.addEventListener('click', () => {
-    const target = ['fConclusion', 'fWhy', 'fHow', 'fScene', 'fReuse'].includes(lastFocusField) ? lastFocusField : 'fConclusion';
+    const target = ['fConclusion', 'fWhy', 'fHow', 'fScene', 'fSop', 'fReuse'].includes(lastFocusField) ? lastFocusField : 'fConclusion';
     const el = $('#' + target);
     const txt = s.textContent.trim();
     if (target === 'fConclusion') el.value = el.value ? el.value + txt : txt;
     else el.value = el.value ? el.value.replace(/\s*$/, '') + '\n' + txt : txt;
     el.dispatchEvent(new Event('input')); el.focus();
-    toast(`已插入到「${{ fConclusion: '一句话结论', fWhy: '分类原因', fHow: '旧版做法', fScene: '应用场景', fReuse: '快速复用' }[target]}」`);
+    toast(`已插入到「${{ fConclusion: '一句话结论', fWhy: '分类原因', fHow: '旧版做法', fScene: '应用场景', fSop: 'SOP', fReuse: '快速复用' }[target]}」`);
   }));
   $('#reparseRaw').addEventListener('click', async () => {
     const raw = d.raw;
@@ -523,7 +528,7 @@ function bindEditor() {
   $('#btnCancel').addEventListener('click', cancelEdit);
   $('#btnPasteStructured').addEventListener('click', openStructuredPaste);
   updateEditSims();
-  const f = S.editing.focus === 'why' ? 'fWhy' : S.editing.focus === 'scene' ? 'fScene' : S.editing.focus === 'reuse' ? 'fReuse' : S.editing.focus === 'how' ? 'fHow' : S.editing.focus === 'prompt' ? 'fPrompt' : S.editing.focus === 'tag' ? 'fTag' : S.editing.focus === 'conclusion' ? 'fConclusion' : null;
+  const f = S.editing.focus === 'why' ? 'fWhy' : S.editing.focus === 'scene' ? 'fScene' : S.editing.focus === 'sop' ? 'fSop' : S.editing.focus === 'reuse' ? 'fReuse' : S.editing.focus === 'how' ? 'fHow' : S.editing.focus === 'prompt' ? 'fPrompt' : S.editing.focus === 'tag' ? 'fTag' : S.editing.focus === 'conclusion' ? 'fConclusion' : null;
   if (f) { const el = $('#' + f); el.focus(); if (el.setSelectionRange) el.setSelectionRange(el.value.length, el.value.length); lastFocusField = f; }
   S.editing.focus = null;
 }
@@ -544,7 +549,7 @@ function clearDraft() { try { localStorage.removeItem(DRAFT_KEY); } catch (_) {}
 async function saveEdit() {
   const ed = S.editing; if (!ed) return;
   const d = { ...ed.draft };
-  if (!normalize([d.conclusion, d.why, d.how, d.raw, d.prompt].join(''))) { toast('还什么都没写呢', true); return; }
+  if (!normalize([d.conclusion, d.why, d.how, d.scene, d.sop, d.reuse, d.raw, d.prompt].join(''))) { toast('还什么都没写呢', true); return; }
   try {
     let e;
     if (ed.id) {
@@ -566,8 +571,8 @@ function cancelEdit() {
   const ed = S.editing;
   const orig = ed.id ? byId(ed.id) : null;
   const d = ed.draft;
-  const dirty = orig ? ['conclusion', 'why', 'how', 'scene', 'reuse', 'system', 'raw', 'prompt', 'type', 'source'].some((k) => (orig[k] || '') !== (d[k] || '')) || (orig.tags || []).join() !== d.tags.join()
-    : normalize([d.conclusion, d.why, d.how, d.raw, d.prompt].join(''));
+  const dirty = orig ? ['conclusion', 'why', 'how', 'scene', 'sop', 'reuse', 'system', 'raw', 'prompt', 'type', 'source'].some((k) => (orig[k] || '') !== (d[k] || '')) || (orig.tags || []).join() !== d.tags.join()
+    : normalize([d.conclusion, d.why, d.how, d.scene, d.sop, d.reuse, d.raw, d.prompt].join(''));
   if (dirty && !confirm('有未保存的修改，确定放弃吗？')) return;
   S.editing = null; clearDraft(); renderDetail();
 }
@@ -605,6 +610,9 @@ function openStructuredPaste() {
 ### 应用场景
 写下适用的情况。
 
+### SOP
+1. **步骤名称**：具体做法（选填）。
+
 ### 快速复用
 写下可以直接复用的内容。</pre><div class="sub" style="margin:8px 0">也支持「1. 为什么这样认为？」等编号标题，以及 Markdown 标题。</div></details>
     <div class="row"><button class="btn" id="pasteFromClipboard">从剪贴板粘贴</button><span class="sub" style="margin:0">也可点击输入框，按 ⌘V / Ctrl+V</span></div>
@@ -630,7 +638,7 @@ function openStructuredPaste() {
         return;
       }
       const matched = entries[0];
-      Object.assign(editing.draft, { conclusion: matched.conclusion, why: matched.why, ...(matched.how ? {how: matched.how} : {}), ...(matched.system ? {system: matched.system} : {}), ...(matched.source ? {source: matched.source} : {}), ...(matched.scene ? {scene: matched.scene} : {}), ...(matched.reuse ? {reuse: matched.reuse} : {}) });
+      Object.assign(editing.draft, { conclusion: matched.conclusion, why: matched.why, ...(matched.how ? {how: matched.how} : {}), ...(matched.system ? {system: matched.system} : {}), ...(matched.source ? {source: matched.source} : {}), ...(matched.scene ? {scene: matched.scene} : {}), ...(matched.sop ? {sop: matched.sop} : {}), ...(matched.reuse ? {reuse: matched.reuse} : {}) });
       saveDraft(); closeModal(); renderDetail(); toast('已填入，请检查后保存');
     } catch (err) { toast('识别失败：' + err.message, true); }
   });
@@ -694,7 +702,7 @@ function openCapture(prefill = '') {
       const tags = $('#cTags', m).value.split(/[,，、\s]+/).map(x => x.trim()).filter(Boolean);
       const source = $('#cSource', m).value;
       ta.dataset.saved = '1'; closeModal();
-      S.editing = { id: null, focus: null, draft: { type, system: e.system || '', scene: e.scene || '', reuse: e.reuse || '', conclusion: e.conclusion, why: e.why, how: e.how, raw, prompt:'', tags, source: e.source || source } };
+      S.editing = { id: null, focus: null, draft: { type, system: e.system || '', scene: e.scene || '', sop: e.sop || '', reuse: e.reuse || '', conclusion: e.conclusion, why: e.why, how: e.how, raw, prompt:'', tags, source: e.source || source } };
       renderDetail(); saveDraft();
       toast('已识别，请检查后保存');
     } catch (err) { toast('识别失败：' + err.message, true); }
@@ -839,7 +847,7 @@ function openImport() {
         ${f.entries.map((e, ei) => `<div class="imp-row">
           <input type="checkbox" data-k="${fi}:${ei}" ${e._checked ? 'checked' : ''}>
           <div class="ct"><div class="c">${e.is_preamble ? '<span class="badge same">文件说明</span> ' : ''}${esc(e.conclusion || '（无结论，将进入收件箱）' + String(e.raw || '').slice(0, 40))}</div>
-            <div class="d">${[e.why && '分类原因 ✓', e.scene && '应用场景 ✓', e.reuse && '快速复用 ✓', e.how && '旧版做法 ✓', e.raw && '原始记录 ✓', e.tags?.length && '标签：' + e.tags.join('、')].filter(Boolean).join(' · ') || '只有一句话'}${e.match.match_id ? ' · 对应：' + esc((byId(e.match.match_id)?.conclusion || '').slice(0, 30)) : ''}</div></div>
+            <div class="d">${[e.why && '分类原因 ✓', e.scene && '应用场景 ✓', e.sop && 'SOP ✓', e.reuse && '快速复用 ✓', e.how && '旧版做法 ✓', e.raw && '原始记录 ✓', e.tags?.length && '标签：' + e.tags.join('、')].filter(Boolean).join(' · ') || '只有一句话'}${e.match.match_id ? ' · 对应：' + esc((byId(e.match.match_id)?.conclusion || '').slice(0, 30)) : ''}</div></div>
           <select data-type-k="${fi}:${ei}"><option value="">未分类</option>${SYSTEMS.map((t) => `<option ${e.system === t ? 'selected' : ''}>${t}</option>`).join('')}</select>
           <span class="badge ${e.match.status}">${STATUS_TEXT[e.match.status]}${e.match.score ? ' ' + Math.round(e.match.score * 100) + '%' : ''}</span>
         </div>`).join('')}</div>`).join('')}</div>`;
@@ -859,7 +867,7 @@ function openImport() {
     $('#impCancel', m).addEventListener('click', closeModal);
     $('#impGo', m).addEventListener('click', async () => {
       const items = sel.map((e) => {
-        const base = { conclusion: e.conclusion, why: e.why, how: e.how, system: e.system || '', scene: e.scene || '', reuse: e.reuse || '', raw: e.raw, prompt: e.prompt, prompt_present: e.prompt_present, tags: e.tags, type: e.type || undefined, source_file: e.source_file, source_text: e.source_text, source_hash: e.source_hash, id: e.id, created: e.created, source: e.source || '导入' };
+        const base = { conclusion: e.conclusion, why: e.why, how: e.how, system: e.system || '', scene: e.scene || '', sop: e.sop || '', reuse: e.reuse || '', raw: e.raw, prompt: e.prompt, prompt_present: e.prompt_present, tags: e.tags, type: e.type || undefined, source_file: e.source_file, source_text: e.source_text, source_hash: e.source_hash, id: e.id, created: e.created, source: e.source || '导入' };
         if (e.status) base.status = e.status;
         if (e.match.status === 'changed' || e.match.status === 'same') return { ...base, action: 'update', target_id: e.match.match_id };
         return { ...base, action: 'create' };
@@ -957,6 +965,7 @@ function entryToMd(e) {
   out.push(`- 记录于: ${String(e.created || '').slice(0, 10)}`, '');
   if (e.why) out.push('### 属于哪个系统，为什么', e.why, '');
   if (e.scene) out.push('### 应用场景', e.scene, '');
+  if (e.sop) out.push('### SOP', e.sop, '');
   if (e.reuse) out.push('### 快速复用', e.reuse, '');
   if (e.how) out.push('### 以后怎么做', e.how, '');
   if (e.raw) out.push('### 原始记录', e.raw.split('\n').map((l) => '> ' + l).join('\n'), '');
@@ -1057,7 +1066,7 @@ function renderAll() { buildDf(); renderNav(); renderList(); renderDetail(); }
 
 function selectEntry(id) {
   if (S.editing) { const ed = S.editing; const orig = ed.id ? byId(ed.id) : null; const d = ed.draft;
-    const dirty = orig ? ['conclusion', 'why', 'how', 'raw', 'prompt'].some((k) => (orig[k] || '') !== (d[k] || '')) : normalize([d.conclusion, d.why, d.how, d.raw, d.prompt].join(''));
+    const dirty = orig ? ['conclusion', 'why', 'how', 'scene', 'sop', 'reuse', 'system', 'source', 'raw', 'prompt'].some((k) => (orig[k] || '') !== (d[k] || '')) : normalize([d.conclusion, d.why, d.how, d.scene, d.sop, d.reuse, d.raw, d.prompt].join(''));
     if (dirty && !confirm('有未保存的修改，确定放弃吗？')) return; S.editing = null; clearDraft(); }
   S.selectedId = id;
   $$('.card').forEach((c) => c.classList.toggle('selected', c.dataset.id === id));

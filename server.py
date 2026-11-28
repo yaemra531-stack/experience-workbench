@@ -116,7 +116,7 @@ class Store:
         return None
 
 
-EDITABLE = ("type", "status", "conclusion", "why", "how", "raw", "prompt", "tags", "source", "system", "scene", "reuse")
+EDITABLE = ("type", "status", "conclusion", "why", "how", "raw", "prompt", "tags", "source", "system", "scene", "sop", "reuse")
 
 
 def new_id():
@@ -167,7 +167,7 @@ def make_entry(d):
 
 
 def snapshot(e):
-    return {k: e.get(k) for k in ("conclusion", "why", "how", "raw", "prompt", "tags", "type", "status", "system", "scene", "reuse", "source")} | {"at": e.get("updated")}
+    return {k: e.get(k) for k in ("conclusion", "why", "how", "raw", "prompt", "tags", "type", "status", "system", "scene", "sop", "reuse", "source")} | {"at": e.get("updated")}
 
 
 def update_entry(e, patch, keep_history=True):
@@ -272,7 +272,7 @@ def do_import(store, items):
             cur = store.get(it["target_id"])
             if cur:
                 patch = {k: it[k] for k in ("conclusion", "why", "how", "raw", "tags", "type") if k in it and it[k] not in (None, "", [])}
-                for key in ("system", "scene", "reuse", "source"):
+                for key in ("system", "scene", "sop", "reuse", "source"):
                     if it.get(key):
                         patch[key] = it[key]
                 if it.get("prompt_present"):

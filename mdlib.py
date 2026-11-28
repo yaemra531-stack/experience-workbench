@@ -16,6 +16,7 @@ FIELD_ALIASES = [
     ("why", ["属于哪个系统，为什么", "为什么这样认为", "为什么这么认为", "为什么", "为何", "原因", "依据", "理由", "背景"]),
     ("how", ["以后怎么做", "下次怎么做", "之后怎么做", "怎么做", "行动建议", "行动", "做法", "方法", "建议"]),
     ("scene", ["应用场景"]),
+    ("sop", ["SOP"]),
     ("reuse", ["快速复用"]),
     ("raw", ["原始记录", "原始想法", "原始对话", "原文"]),
     ("prompt", ["提示词"]),
@@ -76,7 +77,7 @@ def similarity(a, b):
 
 
 def entry_text(e):
-    parts = [e.get("conclusion", ""), e.get("why", ""), e.get("how", ""), e.get("scene", ""), e.get("reuse", "")]
+    parts = [e.get("conclusion", ""), e.get("why", ""), e.get("how", ""), e.get("scene", ""), e.get("sop", ""), e.get("reuse", "")]
     joined = "\n".join(p for p in parts if p)
     return joined if normalize(joined) else e.get("raw", "")
 
@@ -188,7 +189,7 @@ def _first_sentence(text, limit=60):
 
 
 def parse_section(title, body_lines, title_is_heading=True):
-    fields = {"conclusion": [], "why": [], "how": [], "scene": [], "reuse": [], "raw": [], "prompt": []}
+    fields = {"conclusion": [], "why": [], "how": [], "scene": [], "sop": [], "reuse": [], "raw": [], "prompt": []}
     seen_prompt = False
     loose = []
     meta = {}
@@ -257,6 +258,7 @@ def parse_section(title, body_lines, title_is_heading=True):
         "how": f["how"],
         "system": meta.get("system") if meta.get("system") in ("观点", "尝鲜", "干货", "拆解") else "",
         "scene": f["scene"],
+        "sop": f["sop"],
         "reuse": f["reuse"],
         "raw": raw.strip(),
         "prompt": f["prompt"],
@@ -428,6 +430,8 @@ def entry_to_markdown(e, heading_level=2):
         out += [f"{sub} 属于哪个系统，为什么", e["why"].strip(), ""]
     if e.get("scene"):
         out += [f"{sub} 应用场景", e["scene"].strip(), ""]
+    if e.get("sop"):
+        out += [f"{sub} SOP", e["sop"].strip(), ""]
     if e.get("reuse"):
         out += [f"{sub} 快速复用", e["reuse"].strip(), ""]
     if e.get("how"):
