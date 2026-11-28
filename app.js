@@ -8,6 +8,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const TYPES = ['短线', '长线']; // 兼容原有存储和导出
 const SYSTEMS = ['观点', '尝鲜', '干货', '拆解'];
 const category = e => SYSTEMS.includes(e.system) ? e.system : '未分类';
+const SYSTEM_COLOR = {'观点':'var(--system-viewpoint)', '尝鲜':'var(--system-tryout)', '干货':'var(--system-guide)', '拆解':'var(--system-analysis)', '未分类':'var(--system-unclassified)'};
 const SOURCES = ['聊天', '阅读', '学习', '实践', '导入', '其他'];
 
 async function api(method, url, body) {
@@ -132,7 +133,7 @@ function experienceNumbers() {
 }
 function numberChip(e, numbers) {
   const n = numbers.get(e.id);
-  return n ? `<span class="chip number ${esc(e.type)}" title="${esc(category(e))}第 ${n} 条" aria-label="${esc(category(e))}第 ${n} 条">${n}</span>` : '';
+  return n ? `<span class="chip number system-chip" data-system="${esc(category(e))}" title="${esc(category(e))}第 ${n} 条" aria-label="${esc(category(e))}第 ${n} 条">${n}</span>` : '';
 }
 
 
@@ -149,7 +150,7 @@ function upsertLocal(e) {
 const VIEWS = [
   { id: 'inbox', name: '收件箱', icon: '📥', hint: '随手记下、还没整理的想法' },
   { id: 'all', name: '全部经验', icon: '📚' },
-  ...[...SYSTEMS, '未分类'].map(name => ({id:name, name, dot:'var(--long)'})),
+  ...[...SYSTEMS, '未分类'].map(name => ({id:name, name, dot:SYSTEM_COLOR[name]})),
   { id: 'todo', name: '待补全', icon: '✎', hint: '缺“为什么”或“怎么做”的经验' },
   { sep: true },
   { id: 'dups', name: '可能重复', icon: '⧉' },
@@ -250,10 +251,10 @@ function renderList() {
     if (e.status === 'inbox') chips.push('<span class="chip inbox">待整理</span>');
     else if (e.status === 'merged') chips.push('<span class="chip ghost">已合并</span>');
     else if (e.status === 'trashed') chips.push('<span class="chip ghost">回收站</span>');
-    chips.push(`<span class="chip ${e.type}">${esc(category(e))}</span>${numberChip(e, numbers)}`);
+    chips.push(`<span class="chip system-chip" data-system="${esc(category(e))}">${esc(category(e))}</span>${numberChip(e, numbers)}`);
     if (e.status === 'active' && incomplete(e)) chips.push('<span class="chip todo">待补全</span>');
     const tags = (e.tags || []).length ? `<div class="card-tags">${e.tags.slice(0, 5).map((t) => `<span class="tag">${esc(t)}</span>`).join('')}</div>` : '';
-    return `<div class="card ${S.selectedId === e.id ? 'selected' : ''}" data-id="${e.id}">
+    return `<div class="card ${S.selectedId === e.id ? 'selected' : ''}" data-system="${esc(category(e))}" data-id="${e.id}">
       <div class="card-top">${chips.join('')}<span class="date">${fmtDate(S.sort === 'updated' ? e.updated : e.created)}</span></div>
       ${title}${sub}${tags}</div>`;
   }).join('') + (list.length > S.limit ? `<button class="more" data-more>再显示 ${Math.min(200, list.length - S.limit)} 条（共 ${list.length}）</button>` : '');
@@ -283,8 +284,8 @@ function renderDupList() {
   const label = (e) => esc(e.conclusion || String(e.raw || '').slice(0, 60));
   $('#list').innerHTML = pairs.slice(0, 100).map((p) => `
     <div class="dup-pair">
-      <div class="side" data-id="${p.a.id}"><span class="chip ${p.a.type}">${p.a.type}</span> ${label(p.a)}</div>
-      <div class="side" data-id="${p.b.id}"><span class="chip ${p.b.type}">${p.b.type}</span> ${label(p.b)}</div>
+      <div class="side" data-id="${p.a.id}"><span class="chip system-chip" data-system="${esc(category(p.a))}">${esc(category(p.a))}</span> ${label(p.a)}</div>
+      <div class="side" data-id="${p.b.id}"><span class="chip system-chip" data-system="${esc(category(p.b))}">${esc(category(p.b))}</span> ${label(p.b)}</div>
       <div class="acts">
         <span class="badge similar">${Math.round(p.s * 100)}%</span>
         <button class="btn" data-merge="${p.a.id}|${p.b.id}">合并</button>
@@ -325,7 +326,7 @@ function renderDetail() {
 
   const tags = (e.tags || []).map((t) => `<span class="tag">${esc(t)}</span>`).join('');
   const meta = [
-    `<span class="chip ${e.type}">${esc(category(e))}</span>${numberChip(e, experienceNumbers())}`,
+    `<span class="chip system-chip" data-system="${esc(category(e))}">${esc(category(e))}</span>${numberChip(e, experienceNumbers())}`,
     tags ? `<span class="tags">${tags}</span>` : '',
     e.source ? `<span>来源：${esc(e.source)}</span>` : '',
     `<span>记录于 ${fmtDate(e.created, true)}</span>`,
@@ -335,7 +336,7 @@ function renderDetail() {
 
   const sims = isTrash ? [] : similarTo(e, 4);
   const simHtml = sims.length ? `<div class="sub-section"><div class="sub-title">相关的经验</div>${sims.map(({ e: x, s }) => `
-    <div class="sim-item"><span class="chip ${x.type}">${esc(category(x))}</span><span class="t" data-goto="${x.id}">${esc(x.conclusion || String(x.raw).slice(0, 60))}</span>
+    <div class="sim-item"><span class="chip system-chip" data-system="${esc(category(x))}">${esc(category(x))}</span><span class="t" data-goto="${x.id}">${esc(x.conclusion || String(x.raw).slice(0, 60))}</span>
     <span class="score">${s >= SIM_DUP ? '可能重复 · ' : ''}${Math.round(s * 100)}%</span><button class="btn" data-merge="${e.id}|${x.id}">合并</button></div>`).join('')}</div>` : '';
   const hist = (e.history || []).slice().reverse();
   const histHtml = hist.length ? `<div class="sub-section"><details><summary class="sub-title" style="cursor:pointer">修改历史（${hist.length}）</summary>${hist.map((h, i) => `
@@ -540,7 +541,7 @@ function updateEditSims() {
   if (normalize(entryText(fake)).length < 6) { box.innerHTML = ''; return; }
   const sims = similarTo(fake, 3);
   box.innerHTML = sims.length ? `<div class="notice" style="display:block"><div style="margin-bottom:6px">💡 已有相似经验，也许可以合并而不是新增：</div>${sims.map(({ e, s }) => `
-    <div class="sim-item"><span class="chip ${e.type}">${esc(category(e))}</span><span class="t" data-peek="${e.id}">${esc(e.conclusion || String(e.raw).slice(0, 60))}</span><span class="score">${Math.round(s * 100)}%</span></div>`).join('')}</div>` : '';
+    <div class="sim-item"><span class="chip system-chip" data-system="${esc(category(e))}">${esc(category(e))}</span><span class="t" data-peek="${e.id}">${esc(e.conclusion || String(e.raw).slice(0, 60))}</span><span class="score">${Math.round(s * 100)}%</span></div>`).join('')}</div>` : '';
   $$('[data-peek]', box).forEach((x) => x.addEventListener('click', () => peekEntry(x.dataset.peek)));
 }
 const DRAFT_KEY = 'ewb-draft';
@@ -673,7 +674,7 @@ function openCapture(prefill = '') {
     if (normalize(v).length < 6) { $('#cSims').innerHTML = ''; return; }
     const r = similarTo({ id: '__new', conclusion: '', why: '', how: '', raw: v }, 3);
     $('#cSims').innerHTML = r.length ? `<div class="notice" style="display:block;margin:0"><div style="margin-bottom:6px">💡 你以前记过相似的：</div>${r.map(({ e, s }) => `
-      <div class="sim-item"><span class="chip ${e.type}">${esc(category(e))}</span><span class="t" data-peek="${e.id}">${esc(e.conclusion || String(e.raw).slice(0, 60))}</span><span class="score">${Math.round(s * 100)}%</span></div>`).join('')}</div>` : '';
+      <div class="sim-item"><span class="chip system-chip" data-system="${esc(category(e))}">${esc(category(e))}</span><span class="t" data-peek="${e.id}">${esc(e.conclusion || String(e.raw).slice(0, 60))}</span><span class="score">${Math.round(s * 100)}%</span></div>`).join('')}</div>` : '';
     $$('[data-peek]', m).forEach((x) => x.addEventListener('click', () => peekEntry(x.dataset.peek)));
   };
   let tmr; ta.addEventListener('input', () => { clearTimeout(tmr); tmr = setTimeout(sims, 250); });
@@ -715,7 +716,7 @@ function openCapture(prefill = '') {
 function peekEntry(id) {
   const e = byId(id); if (!e) return;
   // 在编辑/记录过程中查看相似条目：用一个不打断的小弹窗
-  const html = `<div class="sub" style="margin:0 0 8px"><span class="chip ${e.type}">${esc(category(e))}</span> 记录于 ${fmtDate(e.created)}</div>
+  const html = `<div class="sub" style="margin:0 0 8px"><span class="chip system-chip" data-system="${esc(category(e))}">${esc(category(e))}</span> 记录于 ${fmtDate(e.created)}</div>
     <h3 style="font-family:var(--serif);font-size:20px">${esc(e.conclusion || '（未整理）')}</h3>
     ${e.why ? `<div class="block why" style="margin-top:12px"><div class="block-label">为什么这样认为</div><div class="block-body">${md(e.why)}</div></div>` : ''}
     ${e.how ? `<div class="block how"><div class="block-label">以后怎么做</div><div class="block-body">${md(e.how)}</div></div>` : ''}
@@ -749,7 +750,7 @@ function openMerge(idA, idB) {
       tags: [...new Set([...(main.tags || []), ...(other.tags || [])])],
       type: main.type,
     };
-    const col = (e, isMain) => `<div class="merge-col ${isMain ? 'main' : ''}"><h4>${isMain ? '保留为主条目' : '将并入主条目'} · <span class="chip ${e.type}">${esc(category(e))}</span></h4>
+    const col = (e, isMain) => `<div class="merge-col ${isMain ? 'main' : ''}"><h4>${isMain ? '保留为主条目' : '将并入主条目'} · <span class="chip system-chip" data-system="${esc(category(e))}">${esc(category(e))}</span></h4>
       <b>${esc(e.conclusion || '（未整理）')}</b>${e.why ? `<div style="margin-top:6px;color:var(--ink-2)">为什么：${esc(e.why)}</div>` : ''}${e.how ? `<div style="margin-top:4px;color:var(--ink-2)">怎么做：${esc(e.how)}</div>` : ''}</div>`;
     const m = openModal(`
       <h3>合并两条经验</h3>

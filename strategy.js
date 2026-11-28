@@ -110,7 +110,7 @@
 
         <section class="ns-sec">
           <h2>栏目 · 按成本配</h2>
-          <div class="ns-columns">${STRATEGY.columns.map(c => `<div class="ns-column"><div class="ns-column-head"><b>${E(c.name)}</b><span>${p.byColumn[c.name]} 条</span></div><span class="ns-column-len">${E(c.len)} · ${E(c.rhythm)}</span><em>${E(c.role)}</em></div>`).join('')}</div>
+          <div class="ns-columns">${STRATEGY.columns.map(c => `<div class="ns-column" data-system="${E(c.name)}"><div class="ns-column-head"><b>${E(c.name)}</b><span>${p.byColumn[c.name]} 条</span></div><span class="ns-column-len">${E(c.len)} · ${E(c.rhythm)}</span><em>${E(c.role)}</em></div>`).join('')}</div>
         </section>
 
         <div class="ns-cols">

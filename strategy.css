@@ -80,3 +80,5 @@
 .ns-time { width:100%; border-collapse:collapse; text-align:left; font-size:14px; }
 .ns-time th,.ns-time td { padding:8px; border-bottom:1px solid var(--line); vertical-align:top; }
 .ns-time td:first-child { white-space:nowrap; }
+
+.ns-column[data-system] { border-top-color: var(--system-color); }

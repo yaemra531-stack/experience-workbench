@@ -1,4 +1,10 @@
 :root {
+  /* 四个系统及未分类的统一颜色 */
+  --system-viewpoint: #B5654A;
+  --system-tryout: #2E8C7E;
+  --system-guide: #4A6FA5;
+  --system-analysis: #7A5C9A;
+  --system-unclassified: #A0A4AB;
   --bg: #f6f4ef;
   --panel: #fffdf9;
   --panel-2: #f1eee7;
@@ -338,3 +344,12 @@ select.inline { border: 1px solid var(--line); background: var(--panel); border-
 .sop-body ol { padding-left: 1.6em; }
 .sop-body li { margin: .55em 0; }
 .sop-body li strong { font-weight: 700; }
+
+/* 系统颜色统一用于标识；深浅模式共用。 */
+[data-system="观点"] { --system-color: var(--system-viewpoint); }
+[data-system="尝鲜"] { --system-color: var(--system-tryout); }
+[data-system="干货"] { --system-color: var(--system-guide); }
+[data-system="拆解"] { --system-color: var(--system-analysis); }
+[data-system="未分类"] { --system-color: var(--system-unclassified); }
+.chip.system-chip { background: var(--system-color); color: #fff; border: 0; }
+.card[data-system] { border-left: 3px solid var(--system-color); }
