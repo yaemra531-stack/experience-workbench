@@ -8,7 +8,7 @@
     // 每周抓完作品后，手动更新发布总数和更新日期。
     publishedCount: 22,
     lastUpdated: '2026-11-27',
-    name: '短线',                                  // 战略名
+    name: '创作',                                  // 战略名
     goal: '一年 1000 次发布（视频和文章都算）',                  // 目标一句话
     target: 1000,                                   // 目标总条数
     perDay: 3,                                      // 每天目标条数
@@ -16,20 +16,20 @@
     checkpointEvery: 100,                           // 每发满多少条做一次复盘
     principles: [
       '一段时间只要一个战略，不随时调整；有新想法先记下来，到检查点再一起看。',
-      '优质是练出来的，不是每一条的标准：短线的标准是「发出去」。',
+      '优质是练出来的，不是每一条的标准：创作的标准是「发出去」。',
     ],
     notDo: ['第 100 条之前不改系统', '不用单条视频的数据评判自己', '不追每一个新功能新工具', '不开新平台不另立新战略'],
     // 栏目名称与创作工作台一致
     columns: [
-      { name: '想法观察', len: '约 15 秒', role: '保底，保证每天都有东西发', rhythm: '每天 1 条' },
-      { name: '新东西上手', len: '15～30 秒', role: '抢时效，满足爽和好奇', rhythm: '有新东西就做' },
-      { name: '痛点解法', len: '约 60 秒', role: '拿收藏，最容易接商单', rhythm: '有好选题才做，不硬凑' },
-      { name: '文章', len: '复盘', role: '把今天最有感觉的点写下来', rhythm: '晚上' },
+      { name: '观点', len: '约 15 秒', role: '我对 AI 的真实反应 · 人格，保底', rhythm: '每天 1 条' },
+      { name: '尝鲜', len: '15～30 秒', role: '替你先玩新东西 · 好奇，抢时效', rhythm: '有新东西就做' },
+      { name: '干货', len: '约 60 秒', role: '教程、测评、速查卡 · 拿收藏', rhythm: '有好选题才做，不硬凑' },
+      { name: '拆解', len: '复盘', role: '拆别人的爆款，写成文章 · 学习，迭代', rhythm: '晚上' },
     ],
     daily: [
-      ['30 分钟', '保底：录 1 条想法观察，发掉'],
-      ['1～1.5 小时', '第二条视频：新东西上手 / 盘点'],
-      ['1～1.5 小时', '深度内容：教程 / 深度测评 / 痛点解法（时间不够先砍这块）'],
+      ['30 分钟', '保底：录 1 条观点，发掉'],
+      ['1～1.5 小时', '第二条视频：尝鲜 / 盘点'],
+      ['1～1.5 小时', '干货：教程 / 深度测评 / 解决实际问题（时间不够先砍这块）'],
       ['晚上 1 小时', '写文章：拆解一条低粉爆款，找可迁移的点 + 今天的复盘'],
     ],
     desiresNote: '所有栏目通用：每条都要有一个让人停下来的理由。',
@@ -41,7 +41,7 @@
       { name: '爽 / 好奇', heart: '没见过的效果', hook: 'AI 给我出了年度报告' },
       { name: '被说中', heart: '心里那句话被讲了出来', hook: '吵完架，让 AI 帮你把话说得不伤人' },
     ],
-    formulaTitle: '痛点解法栏目 · 选题公式',
+    formulaTitle: '干货·选题公式',
     formula: [
       { name: '人性欲望', sub: '为什么停下来' },
       { name: '信息差', sub: '新能力或新用法' },
@@ -49,7 +49,7 @@
     ],
     formulaNote: '三项缺一不可。痛点是「人的麻烦」，不是「AI 的毛病」。场景优先：家人、健康、学习、穿搭、人际关系、情绪 ＞ 职场。',
     rules: [
-      '痛点解法只看 OpenAI、Anthropic、DeepSeek 三家；新东西上手看中美所有 AI 新产品',
+      '干货只看 OpenAI、Anthropic、DeepSeek 三家；尝鲜看中美所有 AI 新产品',
       '开头用生活或工作场景 + 普通人的原话，不出现功能名和英文产品名',
       '要编程、装工具的玩法，改写成网页或 App 里点几下就能用的平替',
       '健康、法律、钱：定位为帮你看懂、帮你准备，不替代专业人士',
@@ -75,7 +75,8 @@
       (db && Array.isArray(db.short) ? db.short : []).forEach(x => {
         if ((x.practiceStatus || (x.status === '已发布' ? '已实践' : '待实践')) !== '已实践') return;
         done++;
-        if (x.column && x.column in byColumn) byColumn[x.column]++;
+        const column = ({'想法观察':'观点','新东西上手':'尝鲜','痛点解法':'干货','深度内容':'干货','文章':'拆解'})[x.column] || x.column;
+        if (column && column in byColumn) byColumn[column]++;
         const at = x.practicedAt ? new Date(x.practicedAt) : null;
         if (at && !Number.isNaN(at.getTime()) && dayKey(at) === today()) todayDone++;
       });
@@ -128,8 +129,8 @@
           <div class="ns-desires">${STRATEGY.desires.map(d => `<div class="ns-desire"><b>${E(d.name)}</b><span>${E(d.heart)}</span><em>「${E(d.hook)}」</em></div>`).join('')}</div>
         </section>
 
-        <section class="ns-sec"><h2>想法观察公式</h2><p>一件 AI 的事 + 真实反应 + 一句判断或一个问题</p></section>
-        <section class="ns-sec"><h2>新东西上手公式</h2><p>一个新奇玩意 + 亲手玩一遍 + 值得玩还是别浪费时间</p></section>
+        <section class="ns-sec"><h2>观点公式</h2><p>一件 AI 的事 + 真实反应 + 一句判断或一个问题</p></section>
+        <section class="ns-sec"><h2>尝鲜公式</h2><p>一个新奇玩意 + 亲手玩一遍 + 值得玩还是别浪费时间</p></section>
         <section class="ns-sec">
           <h2>${E(STRATEGY.formulaTitle)}</h2>
           <div class="ns-formula">${STRATEGY.formula.map(f => `<span class="ns-term"><b>${E(f.name)}</b><small>${E(f.sub)}</small></span>`).join('<span class="ns-times">×</span>')}</div>
@@ -181,11 +182,11 @@
     const field = body && body.closest('.field');
     if (!field) return;
     const column = edit.querySelector('[data-field="column"]')?.value || '';
-    const tips = column === '痛点解法'
+    const tips = column === '干货'
       ? ['① 让人停下来的理由是？', '② 观众没见过吗？', '③ 复制哪一句就能用？']
-      : column === '新东西上手'
+      : column === '尝鲜'
         ? ['① 最惊艳的那一下是什么？', '② 普通人能不能用？']
-        : column === '想法观察'
+        : column === '观点'
           ? ['① 一句话说得完吗？', '② 像跟朋友聊天吗？']
           : ['让人停下来的理由是什么？'];
     field.insertAdjacentHTML('beforebegin', `<div class="ns-check"><span class="ns-check-title">对照战略</span>${tips.map(t => `<span>${E(t)}</span>`).join('')}${latestUpgrade()?`<span><strong>今天的升级点：</strong>${E(latestUpgrade())}</span>`:''}</div>`);

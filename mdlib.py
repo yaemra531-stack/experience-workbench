@@ -13,8 +13,10 @@ TYPES = ("短线", "长线")
 # 字段别名：长的放前面，优先匹配
 FIELD_ALIASES = [
     ("conclusion", ["一句话结论", "核心结论", "一句话", "结论", "标题", "要点"]),
-    ("why", ["为什么这样认为", "为什么这么认为", "为什么", "为何", "原因", "依据", "理由", "背景"]),
+    ("why", ["属于哪个系统，为什么", "为什么这样认为", "为什么这么认为", "为什么", "为何", "原因", "依据", "理由", "背景"]),
     ("how", ["以后怎么做", "下次怎么做", "之后怎么做", "怎么做", "行动建议", "行动", "做法", "方法", "建议"]),
+    ("scene", ["应用场景"]),
+    ("reuse", ["快速复用"]),
     ("raw", ["原始记录", "原始想法", "原始对话", "原文"]),
     ("prompt", ["提示词"]),
 ]
@@ -28,6 +30,7 @@ META_KEYS = {
     "标签": "tags",
     "tags": "tags",
     "来源": "source",
+    "系统": "system",
     "记录于": "created",
     "创建于": "created",
     "更新于": "updated",
@@ -73,7 +76,7 @@ def similarity(a, b):
 
 
 def entry_text(e):
-    parts = [e.get("conclusion", ""), e.get("why", ""), e.get("how", "")]
+    parts = [e.get("conclusion", ""), e.get("why", ""), e.get("how", ""), e.get("scene", ""), e.get("reuse", "")]
     joined = "\n".join(p for p in parts if p)
     return joined if normalize(joined) else e.get("raw", "")
 
@@ -185,14 +188,22 @@ def _first_sentence(text, limit=60):
 
 
 def parse_section(title, body_lines, title_is_heading=True):
-    fields = {"conclusion": [], "why": [], "how": [], "raw": [], "prompt": []}
+    fields = {"conclusion": [], "why": [], "how": [], "scene": [], "reuse": [], "raw": [], "prompt": []}
     seen_prompt = False
     loose = []
     meta = {}
     current = None
     seen_field = False
     meta_zone = True
+    in_code = False
     for line in body_lines:
+        if line.lstrip().startswith("```"):
+            in_code = not in_code
+            (fields[current] if current else loose).append(line)
+            continue
+        if in_code:
+            (fields[current] if current else loose).append(line)
+            continue
         if meta_zone:
             mm = match_meta(line)
             if mm:
@@ -244,6 +255,9 @@ def parse_section(title, body_lines, title_is_heading=True):
         "conclusion": conclusion.strip(),
         "why": f["why"],
         "how": f["how"],
+        "system": meta.get("system") if meta.get("system") in ("观点", "尝鲜", "干货", "拆解") else "",
+        "scene": f["scene"],
+        "reuse": f["reuse"],
         "raw": raw.strip(),
         "prompt": f["prompt"],
         "prompt_present": seen_prompt,
@@ -396,6 +410,8 @@ def entry_to_markdown(e, heading_level=2):
     out = [f"{h} {title}"]
     out.append(f"- id: {e['id']}")
     out.append(f"- 类型: {e.get('type', '短线')}")
+    if e.get("system"):
+        out.append(f"- 系统: {e['system']}")
     if e.get("status") == "inbox":
         out.append("- 状态: 待整理")
     if e.get("tags"):
@@ -409,7 +425,11 @@ def entry_to_markdown(e, heading_level=2):
     out.append("")
     sub = "#" * (heading_level + 1)
     if e.get("why"):
-        out += [f"{sub} 为什么这样认为", e["why"].strip(), ""]
+        out += [f"{sub} 属于哪个系统，为什么", e["why"].strip(), ""]
+    if e.get("scene"):
+        out += [f"{sub} 应用场景", e["scene"].strip(), ""]
+    if e.get("reuse"):
+        out += [f"{sub} 快速复用", e["reuse"].strip(), ""]
     if e.get("how"):
         out += [f"{sub} 以后怎么做", e["how"].strip(), ""]
     if e.get("raw"):

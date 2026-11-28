@@ -332,3 +332,5 @@ select.inline { border: 1px solid var(--line); background: var(--panel); border-
 .cw-optional > summary { cursor: pointer; font-size: 13px; color: var(--ink-3); font-weight: 600; }
 .cw-optional[open] > summary { margin-bottom: 4px; }
 .cw-optional .field { margin: 10px 0 6px; }
+
+.reuse-code{position:relative}.reuse-code pre{padding-top:3em}.reuse-copy{position:absolute;top:8px;right:8px}

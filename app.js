@@ -5,7 +5,9 @@
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const TYPES = ['短线', '长线'];
+const TYPES = ['短线', '长线']; // 兼容原有存储和导出
+const SYSTEMS = ['观点', '尝鲜', '干货', '拆解'];
+const category = e => SYSTEMS.includes(e.system) ? e.system : '未分类';
 const SOURCES = ['聊天', '阅读', '学习', '实践', '导入', '其他'];
 
 async function api(method, url, body) {
@@ -117,12 +119,12 @@ const S = {
 };
 const byId = (id) => S.entries.find((e) => e.id === id);
 const alive = () => S.entries.filter((e) => e.status === 'active' || e.status === 'inbox');
-const incomplete = (e) => e.status !== 'inbox' && (!e.why || !e.how);
+const incomplete = (e) => e.status !== 'inbox' && (!e.why || !(e.scene || e.reuse || e.how));
 // 分类内按记录时间从早到晚编号；并列时沿用原有记录顺序。
 function experienceNumbers() {
   const numbers = new Map();
-  for (const type of TYPES) {
-    const entries = S.entries.filter(e => e.status === 'active' && e.type === type);
+  for (const type of [...SYSTEMS, '未分类']) {
+    const entries = S.entries.filter(e => e.status === 'active' && category(e) === type);
     entries.sort((a, b) => String(a.created || '').localeCompare(String(b.created || '')));
     entries.forEach((e, i) => numbers.set(e.id, i + 1));
   }
@@ -130,7 +132,7 @@ function experienceNumbers() {
 }
 function numberChip(e, numbers) {
   const n = numbers.get(e.id);
-  return n ? `<span class="chip number ${esc(e.type)}" title="${esc(e.type)}第 ${n} 条" aria-label="${esc(e.type)}第 ${n} 条">${n}</span>` : '';
+  return n ? `<span class="chip number ${esc(e.type)}" title="${esc(category(e))}第 ${n} 条" aria-label="${esc(category(e))}第 ${n} 条">${n}</span>` : '';
 }
 
 
@@ -147,8 +149,7 @@ function upsertLocal(e) {
 const VIEWS = [
   { id: 'inbox', name: '收件箱', icon: '📥', hint: '随手记下、还没整理的想法' },
   { id: 'all', name: '全部经验', icon: '📚' },
-  { id: '短线', name: '短线', dot: 'var(--short)' },
-  { id: '长线', name: '长线', dot: 'var(--long)' },
+  ...[...SYSTEMS, '未分类'].map(name => ({id:name, name, dot:'var(--long)'})),
   { id: 'todo', name: '待补全', icon: '✎', hint: '缺“为什么”或“怎么做”的经验' },
   { sep: true },
   { id: 'dups', name: '可能重复', icon: '⧉' },
@@ -158,7 +159,7 @@ function inView(e, v) {
   switch (v) {
     case 'inbox': return e.status === 'inbox';
     case 'all': return e.status === 'active' || e.status === 'inbox';
-    case '短线': case '长线': return e.status === 'active' && e.type === v;
+    case '观点': case '尝鲜': case '干货': case '拆解': case '未分类': return (e.status === 'active' || e.status === 'inbox') && category(e) === v;
     case 'todo': return e.status === 'active' && incomplete(e);
     case 'trash': return e.status === 'trashed' || e.status === 'merged';
     default: return false;
@@ -167,7 +168,7 @@ function inView(e, v) {
 function terms() { return S.q.trim().toLowerCase().split(/\s+/).filter(Boolean); }
 function matchQ(e, ts) {
   if (!ts.length) return true;
-  const hay = [e.conclusion, e.why, e.how, e.raw, e.prompt, (e.tags || []).join(' '), e.source, e.source_file].join('\n').toLowerCase();
+  const hay = [e.conclusion, e.why, e.how, e.scene, e.reuse, e.system, e.raw, e.prompt, (e.tags || []).join(' '), e.source, e.source_file].join('\n').toLowerCase();
   return ts.every((t) => hay.includes(t));
 }
 function filtered() {
@@ -249,7 +250,7 @@ function renderList() {
     if (e.status === 'inbox') chips.push('<span class="chip inbox">待整理</span>');
     else if (e.status === 'merged') chips.push('<span class="chip ghost">已合并</span>');
     else if (e.status === 'trashed') chips.push('<span class="chip ghost">回收站</span>');
-    chips.push(`<span class="chip ${e.type}">${e.type}</span>${numberChip(e, numbers)}`);
+    chips.push(`<span class="chip ${e.type}">${esc(category(e))}</span>${numberChip(e, numbers)}`);
     if (e.status === 'active' && incomplete(e)) chips.push('<span class="chip todo">待补全</span>');
     const tags = (e.tags || []).length ? `<div class="card-tags">${e.tags.slice(0, 5).map((t) => `<span class="tag">${esc(t)}</span>`).join('')}</div>` : '';
     return `<div class="card ${S.selectedId === e.id ? 'selected' : ''}" data-id="${e.id}">
@@ -309,7 +310,6 @@ function renderDetail() {
     bar += `<button class="btn primary" data-act="restore">恢复这条</button><span class="spacer"></span><button class="btn danger" data-act="destroy">彻底删除</button>`;
   } else {
     bar += `<button class="btn primary" data-act="edit">${e.status === 'inbox' ? '整理这条' : '编辑'} <kbd>E</kbd></button>
-      <button class="btn" data-act="switch">转为${other}</button>
       <button class="btn" data-act="copy">复制 Markdown</button>
       <span class="spacer"></span>
       <button class="btn danger" data-act="trash">移到回收站</button>`;
@@ -325,7 +325,7 @@ function renderDetail() {
 
   const tags = (e.tags || []).map((t) => `<span class="tag">${esc(t)}</span>`).join('');
   const meta = [
-    `<span class="chip ${e.type}">${e.type}</span>${numberChip(e, experienceNumbers())}`,
+    `<span class="chip ${e.type}">${esc(category(e))}</span>${numberChip(e, experienceNumbers())}`,
     tags ? `<span class="tags">${tags}</span>` : '',
     e.source ? `<span>来源：${esc(e.source)}</span>` : '',
     `<span>记录于 ${fmtDate(e.created, true)}</span>`,
@@ -335,7 +335,7 @@ function renderDetail() {
 
   const sims = isTrash ? [] : similarTo(e, 4);
   const simHtml = sims.length ? `<div class="sub-section"><div class="sub-title">相关的经验</div>${sims.map(({ e: x, s }) => `
-    <div class="sim-item"><span class="chip ${x.type}">${x.type}</span><span class="t" data-goto="${x.id}">${esc(x.conclusion || String(x.raw).slice(0, 60))}</span>
+    <div class="sim-item"><span class="chip ${x.type}">${esc(category(x))}</span><span class="t" data-goto="${x.id}">${esc(x.conclusion || String(x.raw).slice(0, 60))}</span>
     <span class="score">${s >= SIM_DUP ? '可能重复 · ' : ''}${Math.round(s * 100)}%</span><button class="btn" data-merge="${e.id}|${x.id}">合并</button></div>`).join('')}</div>` : '';
   const hist = (e.history || []).slice().reverse();
   const histHtml = hist.length ? `<div class="sub-section"><details><summary class="sub-title" style="cursor:pointer">修改历史（${hist.length}）</summary>${hist.map((h, i) => `
@@ -347,13 +347,20 @@ function renderDetail() {
     ${notice}
     ${e.conclusion ? `<h1 class="conclusion">${ts.length ? hl(e.conclusion, ts) : esc(e.conclusion)}</h1>` : `<h1 class="conclusion placeholder">${isTrash ? '（没有结论）' : '还没有一句话结论'}</h1>`}
     <div class="meta">${meta}</div>
-    ${e.status === 'inbox' ? '' : block('why', '为什么这样认为', e.why, 'why', '补充：当时为什么会这样认为？依据或经历是什么？')}
-    ${e.status === 'inbox' ? '' : block('how', '以后怎么做', e.how, 'how', '补充：下次遇到类似情况，具体怎么做？')}
+    ${e.status === 'inbox' ? '' : block('why', '属于哪个系统，为什么', e.why, 'why', '补充分类原因')}
+    ${e.status === 'inbox' ? '' : block('how', '应用场景', e.scene, 'scene', '补充应用场景')}
+    ${e.status === 'inbox' ? '' : `<div class="block how"><div class="block-label">快速复用</div><div class="block-body">${e.reuse ? reuseMd(e.reuse) : '<span class="missing" data-fill="reuse">＋ 补充快速复用</span>'}</div></div>`}
+    ${e.how ? block('how', '旧版做法', e.how, 'how', '') : ''}
     ${e.raw ? `<details class="raw" ${e.status === 'inbox' || !e.conclusion || (ts.length && matchQ({ conclusion: e.raw, tags: [] }, ts)) ? 'open' : ''}><summary>原始记录</summary><div class="block-body">${ts.length ? hlMd(e.raw, ts) : md(e.raw)}</div></details>` : ''}
     <details class="raw" ${ts.length && e.prompt && matchQ({ conclusion: e.prompt, tags: [] }, ts) ? 'open' : ''}><summary>提示词</summary><div class="block-body">${e.prompt ? (ts.length ? hlMd(e.prompt, ts) : md(e.prompt)) : '<span class="missing" data-fill="prompt">＋ 添加提示词</span>'}${e.prompt && !isTrash ? '<div style="margin-top:10px"><button class="btn" data-act="copyPrompt">复制提示词</button></div>' : ''}</div></details>
     ${simHtml}${histHtml}
   </div>`;
   if (fresh) $('.detail', el).classList.add('rise');
+}
+function reuseMd(text) {
+  const div = document.createElement('div'); div.innerHTML = md(text);
+  div.querySelectorAll('pre').forEach(pre => { const wrap=document.createElement('div'); wrap.className='reuse-code'; pre.replaceWith(wrap); wrap.append(pre); const button=document.createElement('button'); button.type='button'; button.className='btn reuse-copy'; button.dataset.copyCode=''; button.textContent='复制'; wrap.append(button); });
+  return div.innerHTML;
 }
 function hlMd(text, ts) {
   // 渲染后在文本节点里高亮
@@ -384,7 +391,7 @@ function welcomeHtml() {
       <h2>把有价值的想法留下来</h2>
       <div>和 AI 聊天、读书、动手时冒出的经验，都可以在这里记下、整理、重温。</div>
       <div class="steps">
-        <div class="step"><b>1</b><span>导入现有的 Harness Markdown（短线 / 长线）</span><button class="btn" data-act="import">导入</button></div>
+        <div class="step"><b>1</b><span>导入现有的 Harness Markdown</span><button class="btn" data-act="import">导入</button></div>
         <div class="step"><b>2</b><span>有新想法时按 <kbd>N</kbd>，粘贴进来就算记下了</span><button class="btn" data-act="capture">记一下</button></div>
         <div class="step"><b>3</b><span>有空时把收件箱里的想法整理成「结论 / 为什么 / 怎么做」</span></div>
         <div class="step"><b>4</b><span>导出 Markdown，交给 Agent 继续维护 Harness</span><button class="btn" data-act="export">导出</button></div>
@@ -395,8 +402,7 @@ function welcomeHtml() {
   return `<div class="welcome">
     <h2>今天想起点什么？</h2>
     <div class="stats">
-      <div class="stat"><div class="n">${a.filter((e) => e.status === 'active' && e.type === '短线').length}</div><div class="l">短线</div></div>
-      <div class="stat"><div class="n">${a.filter((e) => e.status === 'active' && e.type === '长线').length}</div><div class="l">长线</div></div>
+      ${[...SYSTEMS, '未分类'].map(name => `<div class="stat"><div class="n">${a.filter(e => category(e) === name).length}</div><div class="l">${name}</div></div>`).join('')}
       <div class="stat"><div class="n">${inbox}</div><div class="l">待整理</div></div>
     </div>
     <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
@@ -416,8 +422,8 @@ function startEdit(id, focusField) {
     id: e?.id || null,
     focus: focusField || (e && !e.conclusion ? 'conclusion' : null),
     draft: {
-      type: e?.type || '短线', conclusion: e?.conclusion || '', why: e?.why || '', how: e?.how || '',
-      raw: e?.raw || '', prompt: e?.prompt || '', tags: [...(e?.tags || [])], source: e?.source || '聊天',
+      type: e?.type || '短线', system: e?.system || '', scene: e?.scene || '', reuse: e?.reuse || '', conclusion: e?.conclusion || '', why: e?.why || '', how: e?.how || '',
+      raw: e?.raw || '', prompt: e?.prompt || '', tags: [...(e?.tags || [])], source: e?.source || '',
     },
   };
   renderDetail();
@@ -431,17 +437,18 @@ function editorHtml() {
     <div class="detail-toolbar"><b style="font-size:15px">${e ? (e.status === 'inbox' ? '整理这条想法' : '编辑经验') : '新经验'}</b>
       <span class="spacer"></span><span style="font-size:12px;color:var(--ink-3)">只写你真正想到的，空着也没关系</span></div>
     <div class="row">
-      <div class="seg" id="segType">${TYPES.map((t) => `<button class="${t} ${d.type === t ? 'on' : ''}" data-type="${t}">${t}</button>`).join('')}</div>
-      <select class="inline" id="fSource" title="来源">${srcOpts}</select>
+      <select class="inline" id="fSystem" aria-label="系统"><option value="">未分类</option>${SYSTEMS.map(s => `<option ${d.system === s ? 'selected' : ''}>${s}</option>`).join('')}</select>
+      <input class="inline" id="fSource" aria-label="来源" placeholder="来源：哪次实践 · 日期" value="${esc(d.source || '')}">
       <div class="tag-input" id="tagInput">${d.tags.map((t) => `<span class="tag">${esc(t)}<button data-rmtag="${esc(t)}">×</button></span>`).join('')}
         <input id="fTag" list="tagList" placeholder="${d.tags.length ? '' : '加标签，回车确认'}"><datalist id="tagList">${allTags().map((t) => `<option value="${esc(t)}">`).join('')}</datalist></div>
     </div>
     <div class="field"><label>一句话结论 <span class="hint" id="cLen"></span></label>
       <input type="text" class="f-conclusion" id="fConclusion" value="${esc(d.conclusion)}" placeholder="用一句话说清这条经验，例如：先让 AI 复述需求再执行"></div>
-    <div class="field"><label>为什么这样认为 <span class="hint">依据、经历、当时的情境</span></label>
+    <div class="field"><label>属于哪个系统，为什么 <span class="hint">依据、经历、当时的情境</span></label>
       <textarea id="fWhy" placeholder="是什么让你得出这个结论？">${esc(d.why)}</textarea></div>
-    <div class="field"><label>以后怎么做 <span class="hint">写成下次能直接照做的动作</span></label>
-      <textarea id="fHow" placeholder="下次遇到类似情况，具体怎么做？">${esc(d.how)}</textarea></div>
+    <div class="field"><label>应用场景</label><textarea id="fScene">${esc(d.scene || '')}</textarea></div>
+    <div class="field"><label>快速复用</label><textarea id="fReuse">${esc(d.reuse || '')}</textarea></div>
+    <div class="field" ${d.how ? '' : 'hidden'}><label>旧版做法</label><textarea id="fHow">${esc(d.how)}</textarea></div>
     <div class="field"><label>原始记录 <span class="hint">保留原话，不会被改写</span></label>
       <button type="button" class="btn" id="reparseRaw">从原始记录重新识别</button>
       ${d.raw ? `<div class="raw-helper-tip">点击下面的句子，可插入到上面正在编辑的栏目里</div><div class="raw-helper" id="rawHelper">${sentenceSpans(d.raw)}</div>` : ''}
@@ -469,11 +476,11 @@ let lastFocusField = 'fConclusion';
 function bindEditor() {
   const d = S.editing.draft;
   const bind = (id, key) => { const el = $('#' + id); el.addEventListener('input', () => { d[key] = el.value; saveDraft(); if (key !== 'raw') updateEditSims(); }); el.addEventListener('focus', () => { lastFocusField = id; }); };
-  bind('fConclusion', 'conclusion'); bind('fWhy', 'why'); bind('fHow', 'how'); bind('fRaw', 'raw'); bind('fPrompt', 'prompt');
+  bind('fConclusion', 'conclusion'); bind('fWhy', 'why'); bind('fScene', 'scene'); bind('fReuse', 'reuse'); bind('fHow', 'how'); bind('fRaw', 'raw'); bind('fPrompt', 'prompt');
   const cl = () => { const n = d.conclusion.length; $('#cLen').textContent = n ? `${n} 字${n > 50 ? ' · 试试更短一点' : ''}` : ''; };
   $('#fConclusion').addEventListener('input', cl); cl();
-  $('#fSource').addEventListener('change', (ev) => { d.source = ev.target.value; saveDraft(); });
-  $$('#segType button').forEach((b) => b.addEventListener('click', () => { d.type = b.dataset.type; $$('#segType button').forEach((x) => x.classList.toggle('on', x === b)); saveDraft(); }));
+  $('#fSource').addEventListener('input', ev => { d.source = ev.target.value; saveDraft(); });
+  $('#fSystem').addEventListener('change', ev => { d.system = ev.target.value; saveDraft(); });
   const tagIn = $('#fTag');
   const addTag = () => {
     const vals = tagIn.value.split(/[,，、\s]+/).map((s) => s.trim()).filter(Boolean);
@@ -489,13 +496,13 @@ function bindEditor() {
   tagIn.addEventListener('change', addTag);
   $$('[data-rmtag]').forEach((b) => b.addEventListener('click', () => { d.tags = d.tags.filter((t) => t !== b.dataset.rmtag); saveDraft(); refreshEditorKeep(); }));
   $$('#rawHelper .s').forEach((s) => s.addEventListener('click', () => {
-    const target = ['fConclusion', 'fWhy', 'fHow'].includes(lastFocusField) ? lastFocusField : 'fConclusion';
+    const target = ['fConclusion', 'fWhy', 'fHow', 'fScene', 'fReuse'].includes(lastFocusField) ? lastFocusField : 'fConclusion';
     const el = $('#' + target);
     const txt = s.textContent.trim();
     if (target === 'fConclusion') el.value = el.value ? el.value + txt : txt;
     else el.value = el.value ? el.value.replace(/\s*$/, '') + '\n' + txt : txt;
     el.dispatchEvent(new Event('input')); el.focus();
-    toast(`已插入到「${{ fConclusion: '一句话结论', fWhy: '为什么', fHow: '怎么做' }[target]}」`);
+    toast(`已插入到「${{ fConclusion: '一句话结论', fWhy: '分类原因', fHow: '旧版做法', fScene: '应用场景', fReuse: '快速复用' }[target]}」`);
   }));
   $('#reparseRaw').addEventListener('click', async () => {
     const raw = d.raw;
@@ -516,7 +523,7 @@ function bindEditor() {
   $('#btnCancel').addEventListener('click', cancelEdit);
   $('#btnPasteStructured').addEventListener('click', openStructuredPaste);
   updateEditSims();
-  const f = S.editing.focus === 'why' ? 'fWhy' : S.editing.focus === 'how' ? 'fHow' : S.editing.focus === 'prompt' ? 'fPrompt' : S.editing.focus === 'tag' ? 'fTag' : S.editing.focus === 'conclusion' ? 'fConclusion' : null;
+  const f = S.editing.focus === 'why' ? 'fWhy' : S.editing.focus === 'scene' ? 'fScene' : S.editing.focus === 'reuse' ? 'fReuse' : S.editing.focus === 'how' ? 'fHow' : S.editing.focus === 'prompt' ? 'fPrompt' : S.editing.focus === 'tag' ? 'fTag' : S.editing.focus === 'conclusion' ? 'fConclusion' : null;
   if (f) { const el = $('#' + f); el.focus(); if (el.setSelectionRange) el.setSelectionRange(el.value.length, el.value.length); lastFocusField = f; }
   S.editing.focus = null;
 }
@@ -528,7 +535,7 @@ function updateEditSims() {
   if (normalize(entryText(fake)).length < 6) { box.innerHTML = ''; return; }
   const sims = similarTo(fake, 3);
   box.innerHTML = sims.length ? `<div class="notice" style="display:block"><div style="margin-bottom:6px">💡 已有相似经验，也许可以合并而不是新增：</div>${sims.map(({ e, s }) => `
-    <div class="sim-item"><span class="chip ${e.type}">${e.type}</span><span class="t" data-peek="${e.id}">${esc(e.conclusion || String(e.raw).slice(0, 60))}</span><span class="score">${Math.round(s * 100)}%</span></div>`).join('')}</div>` : '';
+    <div class="sim-item"><span class="chip ${e.type}">${esc(category(e))}</span><span class="t" data-peek="${e.id}">${esc(e.conclusion || String(e.raw).slice(0, 60))}</span><span class="score">${Math.round(s * 100)}%</span></div>`).join('')}</div>` : '';
   $$('[data-peek]', box).forEach((x) => x.addEventListener('click', () => peekEntry(x.dataset.peek)));
 }
 const DRAFT_KEY = 'ewb-draft';
@@ -559,7 +566,7 @@ function cancelEdit() {
   const ed = S.editing;
   const orig = ed.id ? byId(ed.id) : null;
   const d = ed.draft;
-  const dirty = orig ? ['conclusion', 'why', 'how', 'raw', 'prompt', 'type', 'source'].some((k) => (orig[k] || '') !== (d[k] || '')) || (orig.tags || []).join() !== d.tags.join()
+  const dirty = orig ? ['conclusion', 'why', 'how', 'scene', 'reuse', 'system', 'raw', 'prompt', 'type', 'source'].some((k) => (orig[k] || '') !== (d[k] || '')) || (orig.tags || []).join() !== d.tags.join()
     : normalize([d.conclusion, d.why, d.how, d.raw, d.prompt].join(''));
   if (dirty && !confirm('有未保存的修改，确定放弃吗？')) return;
   S.editing = null; clearDraft(); renderDetail();
@@ -587,15 +594,19 @@ function openStructuredPaste() {
   if (!editing) return;
   const m = openModal(`
     <h3>粘贴并匹配格式</h3>
-    <div class="sub">识别后直接填入标题、原因和做法；原始记录和提示词保留，最后点「保存」。</div>
-    <details open><summary>查看可用格式</summary><pre class="pre-md">标题：一句话结论
+    <div class="sub">识别后直接填入对应栏目；原始记录和提示词保留，最后点「保存」。</div>
+    <details open><summary>查看可用格式</summary><pre class="pre-md">## 一句话结论
+- 系统: 观点 / 尝鲜 / 干货 / 拆解
+- 来源: 哪次实践 · 日期
 
-为什么这样认为：
-写下依据、经历或情境。
+### 属于哪个系统，为什么
+写下理由。
 
-以后怎么做：
-1. 写下具体行动。
-2. 可以继续分条。</pre><div class="sub" style="margin:8px 0">也支持「1. 为什么这样认为？」等编号标题，以及 Markdown 标题。</div></details>
+### 应用场景
+写下适用的情况。
+
+### 快速复用
+写下可以直接复用的内容。</pre><div class="sub" style="margin:8px 0">也支持「1. 为什么这样认为？」等编号标题，以及 Markdown 标题。</div></details>
     <div class="row"><button class="btn" id="pasteFromClipboard">从剪贴板粘贴</button><span class="sub" style="margin:0">也可点击输入框，按 ⌘V / Ctrl+V</span></div>
     <textarea id="structuredPasteText" class="capture" aria-label="粘贴完整修改稿" placeholder="在这里粘贴完整修改稿" style="margin-top:10px"></textarea>
     <div id="structuredPasteError"></div>
@@ -614,12 +625,12 @@ function openStructuredPaste() {
       const parsed = await api('POST', '/api/parse', { files: [{ filename: '粘贴的内容.md', text }] });
       if (S.editing !== editing || !m.isConnected || input.value.trim() !== text) return;
       const entries = parsed.files.flatMap(f => f.entries);
-      if (entries.length !== 1 || !entries[0].conclusion || !entries[0].why || !entries[0].how) {
-        error.innerHTML = '<div class="notice" style="margin-top:12px">未完整识别。请按示例填写标题、为什么这样认为和以后怎么做三个栏目，原有内容没有改变。</div>';
+      if (entries.length !== 1 || !entries[0].conclusion || !entries[0].why || !(entries[0].how || entries[0].scene || entries[0].reuse)) {
+        error.innerHTML = '<div class="notice" style="margin-top:12px">未完整识别。请按示例填写结论、分类原因及应用场景或快速复用，原有内容没有改变。</div>';
         return;
       }
       const matched = entries[0];
-      Object.assign(editing.draft, { conclusion: matched.conclusion, why: matched.why, how: matched.how });
+      Object.assign(editing.draft, { conclusion: matched.conclusion, why: matched.why, ...(matched.how ? {how: matched.how} : {}), ...(matched.system ? {system: matched.system} : {}), ...(matched.source ? {source: matched.source} : {}), ...(matched.scene ? {scene: matched.scene} : {}), ...(matched.reuse ? {reuse: matched.reuse} : {}) });
       saveDraft(); closeModal(); renderDetail(); toast('已填入，请检查后保存');
     } catch (err) { toast('识别失败：' + err.message, true); }
   });
@@ -632,7 +643,7 @@ function openCapture(prefill = '') {
     <div class="sub">把想法、聊天片段或摘录直接粘贴进来。已有「标题、为什么这样认为、以后怎么做」时，可直接识别并填写。</div>
     <textarea class="capture" id="cText" placeholder="刚刚想到……">${esc(prefill)}</textarea>
     <div class="row">
-      <div class="seg" id="cType">${TYPES.map((t, i) => `<button class="${t} ${i === 0 ? 'on' : ''}" data-type="${t}">${t}</button>`).join('')}</div>
+      <select class="inline" id="cSystem" aria-label="系统"><option value="">未分类</option>${SYSTEMS.map(s=>`<option>${s}</option>`).join('')}</select>
       <select class="inline" id="cSource">${SOURCES.filter((s) => s !== '导入').map((s) => `<option>${s}</option>`).join('')}</select>
       <input type="text" id="cTags" list="cTagList" placeholder="标签（可选，逗号分隔）" style="flex:1;min-width:140px;padding:6px 10px"><datalist id="cTagList">${allTags().map((t) => `<option value="${esc(t)}">`).join('')}</datalist>
     </div>
@@ -646,7 +657,7 @@ function openCapture(prefill = '') {
     onClose: () => { const v = $('#cText')?.value.trim(); if (v && !$('#cText').dataset.saved && !confirm('还没保存，确定关闭吗？')) return false; },
   });
   let type = '短线';
-  $$('#cType button', m).forEach((b) => b.addEventListener('click', () => { type = b.dataset.type; $$('#cType button', m).forEach((x) => x.classList.toggle('on', x === b)); }));
+
   const ta = $('#cText', m); ta.focus();
   const sims = () => {
     if (!$('#cSims')) return;
@@ -654,7 +665,7 @@ function openCapture(prefill = '') {
     if (normalize(v).length < 6) { $('#cSims').innerHTML = ''; return; }
     const r = similarTo({ id: '__new', conclusion: '', why: '', how: '', raw: v }, 3);
     $('#cSims').innerHTML = r.length ? `<div class="notice" style="display:block;margin:0"><div style="margin-bottom:6px">💡 你以前记过相似的：</div>${r.map(({ e, s }) => `
-      <div class="sim-item"><span class="chip ${e.type}">${e.type}</span><span class="t" data-peek="${e.id}">${esc(e.conclusion || String(e.raw).slice(0, 60))}</span><span class="score">${Math.round(s * 100)}%</span></div>`).join('')}</div>` : '';
+      <div class="sim-item"><span class="chip ${e.type}">${esc(category(e))}</span><span class="t" data-peek="${e.id}">${esc(e.conclusion || String(e.raw).slice(0, 60))}</span><span class="score">${Math.round(s * 100)}%</span></div>`).join('')}</div>` : '';
     $$('[data-peek]', m).forEach((x) => x.addEventListener('click', () => peekEntry(x.dataset.peek)));
   };
   let tmr; ta.addEventListener('input', () => { clearTimeout(tmr); tmr = setTimeout(sims, 250); });
@@ -663,7 +674,7 @@ function openCapture(prefill = '') {
     if (!raw) { toast('先写点什么吧', true); ta.focus(); return; }
     const tags = $('#cTags').value.split(/[,，、\s]+/).map((s) => s.trim()).filter(Boolean);
     try {
-      const e = (await api('POST', '/api/entries', { type, raw, tags, source: $('#cSource').value, status: 'inbox' })).entry;
+      const e = (await api('POST', '/api/entries', { type, system: $('#cSystem').value, raw, tags, source: $('#cSource').value, status: 'inbox' })).entry;
       upsertLocal(e); ta.dataset.saved = '1'; closeModal();
       if (organize) { S.view = 'inbox'; S.selectedId = e.id; renderAll(); startEdit(e.id, 'conclusion'); }
       else { if (S.view === 'inbox' || S.view === 'all') S.selectedId = e.id; renderAll(); toast('已存入收件箱'); }
@@ -683,7 +694,7 @@ function openCapture(prefill = '') {
       const tags = $('#cTags', m).value.split(/[,，、\s]+/).map(x => x.trim()).filter(Boolean);
       const source = $('#cSource', m).value;
       ta.dataset.saved = '1'; closeModal();
-      S.editing = { id: null, focus: null, draft: { type, conclusion: e.conclusion, why: e.why, how: e.how, raw, tags, source } };
+      S.editing = { id: null, focus: null, draft: { type, system: e.system || '', scene: e.scene || '', reuse: e.reuse || '', conclusion: e.conclusion, why: e.why, how: e.how, raw, prompt:'', tags, source: e.source || source } };
       renderDetail(); saveDraft();
       toast('已识别，请检查后保存');
     } catch (err) { toast('识别失败：' + err.message, true); }
@@ -696,7 +707,7 @@ function openCapture(prefill = '') {
 function peekEntry(id) {
   const e = byId(id); if (!e) return;
   // 在编辑/记录过程中查看相似条目：用一个不打断的小弹窗
-  const html = `<div class="sub" style="margin:0 0 8px"><span class="chip ${e.type}">${e.type}</span> 记录于 ${fmtDate(e.created)}</div>
+  const html = `<div class="sub" style="margin:0 0 8px"><span class="chip ${e.type}">${esc(category(e))}</span> 记录于 ${fmtDate(e.created)}</div>
     <h3 style="font-family:var(--serif);font-size:20px">${esc(e.conclusion || '（未整理）')}</h3>
     ${e.why ? `<div class="block why" style="margin-top:12px"><div class="block-label">为什么这样认为</div><div class="block-body">${md(e.why)}</div></div>` : ''}
     ${e.how ? `<div class="block how"><div class="block-label">以后怎么做</div><div class="block-body">${md(e.how)}</div></div>` : ''}
@@ -730,7 +741,7 @@ function openMerge(idA, idB) {
       tags: [...new Set([...(main.tags || []), ...(other.tags || [])])],
       type: main.type,
     };
-    const col = (e, isMain) => `<div class="merge-col ${isMain ? 'main' : ''}"><h4>${isMain ? '保留为主条目' : '将并入主条目'} · <span class="chip ${e.type}">${e.type}</span></h4>
+    const col = (e, isMain) => `<div class="merge-col ${isMain ? 'main' : ''}"><h4>${isMain ? '保留为主条目' : '将并入主条目'} · <span class="chip ${e.type}">${esc(category(e))}</span></h4>
       <b>${esc(e.conclusion || '（未整理）')}</b>${e.why ? `<div style="margin-top:6px;color:var(--ink-2)">为什么：${esc(e.why)}</div>` : ''}${e.how ? `<div style="margin-top:4px;color:var(--ink-2)">怎么做：${esc(e.how)}</div>` : ''}</div>`;
     const m = openModal(`
       <h3>合并两条经验</h3>
@@ -823,32 +834,32 @@ function openImport() {
       <div class="imp-file"><div class="imp-file-head"><span class="path">📄 ${esc(f.path)}</span>
         ${f.is_workbench_export ? '<span class="badge same">工作台导出的文件</span>' : ''}
         <span style="color:var(--ink-3)">${f.entries.length} 条</span>
-        <select data-ftype="${fi}" title="整份文件的类型"><option value="">类型：${f.file_type ? '自动（' + f.file_type + '）' : '请选择'}</option>${TYPES.map((t) => `<option value="${t}">全部设为${t}</option>`).join('')}</select>
+        <select data-ftype="${fi}" title="整份文件的系统"><option value="">系统：保留各条设置</option>${SYSTEMS.map((t) => `<option value="${t}">全部设为${t}</option>`).join('')}</select>
         <button class="btn" data-fall="${fi}">全选</button><button class="btn" data-fnone="${fi}">全不选</button></div>
         ${f.entries.map((e, ei) => `<div class="imp-row">
           <input type="checkbox" data-k="${fi}:${ei}" ${e._checked ? 'checked' : ''}>
           <div class="ct"><div class="c">${e.is_preamble ? '<span class="badge same">文件说明</span> ' : ''}${esc(e.conclusion || '（无结论，将进入收件箱）' + String(e.raw || '').slice(0, 40))}</div>
-            <div class="d">${[e.why && '为什么 ✓', e.how && '怎么做 ✓', e.raw && '原始记录 ✓', e.tags?.length && '标签：' + e.tags.join('、')].filter(Boolean).join(' · ') || '只有一句话'}${e.match.match_id ? ' · 对应：' + esc((byId(e.match.match_id)?.conclusion || '').slice(0, 30)) : ''}</div></div>
-          <select data-type-k="${fi}:${ei}">${TYPES.map((t) => `<option ${e.type === t ? 'selected' : ''}>${t}</option>`).join('')}${e.type ? '' : '<option selected value="">选择类型</option>'}</select>
+            <div class="d">${[e.why && '分类原因 ✓', e.scene && '应用场景 ✓', e.reuse && '快速复用 ✓', e.how && '旧版做法 ✓', e.raw && '原始记录 ✓', e.tags?.length && '标签：' + e.tags.join('、')].filter(Boolean).join(' · ') || '只有一句话'}${e.match.match_id ? ' · 对应：' + esc((byId(e.match.match_id)?.conclusion || '').slice(0, 30)) : ''}</div></div>
+          <select data-type-k="${fi}:${ei}"><option value="">未分类</option>${SYSTEMS.map((t) => `<option ${e.system === t ? 'selected' : ''}>${t}</option>`).join('')}</select>
           <span class="badge ${e.match.status}">${STATUS_TEXT[e.match.status]}${e.match.score ? ' ' + Math.round(e.match.score * 100) + '%' : ''}</span>
         </div>`).join('')}</div>`).join('')}</div>`;
     const get = (k) => { const [a, b] = k.split(':').map(Number); return files[a].entries[b]; };
     $$('input[data-k]', box).forEach((c) => c.addEventListener('change', () => { get(c.dataset.k)._checked = c.checked; drawActions(); }));
-    $$('select[data-type-k]', box).forEach((s) => s.addEventListener('change', () => { get(s.dataset.typeK).type = s.value; drawActions(); }));
-    $$('select[data-ftype]', box).forEach((s) => s.addEventListener('change', () => { if (s.value) { files[+s.dataset.ftype].entries.forEach((e) => (e.type = s.value)); drawPreview(); } }));
+    $$('select[data-type-k]', box).forEach((s) => s.addEventListener('change', () => { get(s.dataset.typeK).system = s.value; drawActions(); }));
+    $$('select[data-ftype]', box).forEach((s) => s.addEventListener('change', () => { if (s.value) { files[+s.dataset.ftype].entries.forEach((e) => (e.system = s.value)); drawPreview(); } }));
     $$('[data-fall]', box).forEach((b) => b.addEventListener('click', () => { files[+b.dataset.fall].entries.forEach((e) => (e._checked = true)); drawPreview(); }));
     $$('[data-fnone]', box).forEach((b) => b.addEventListener('click', () => { files[+b.dataset.fnone].entries.forEach((e) => (e._checked = false)); drawPreview(); }));
     drawActions();
   };
   const drawActions = () => {
     const sel = (preview?.files || []).flatMap((f) => f.entries).filter((e) => e._checked);
-    const noType = sel.filter((e) => !e.type).length;
-    $('#impActions', m).innerHTML = `<span style="font-size:13px;color:var(--ink-3)">已选 ${sel.length} 条${noType ? `，其中 <b style="color:var(--warn)">${noType} 条未选类型</b>（将默认为短线）` : ''}</span>
+    const noType = sel.filter((e) => !e.system).length;
+    $('#impActions', m).innerHTML = `<span style="font-size:13px;color:var(--ink-3)">已选 ${sel.length} 条${noType ? `，其中 <b style="color:var(--warn)">${noType} 条未分类</b>` : ''}</span>
       <span class="spacer"></span><button class="btn" id="impCancel">取消</button><button class="btn primary" id="impGo" ${sel.length ? '' : 'disabled'}>导入 ${sel.length} 条</button>`;
     $('#impCancel', m).addEventListener('click', closeModal);
     $('#impGo', m).addEventListener('click', async () => {
       const items = sel.map((e) => {
-        const base = { conclusion: e.conclusion, why: e.why, how: e.how, raw: e.raw, prompt: e.prompt, prompt_present: e.prompt_present, tags: e.tags, type: e.type || '短线', source_file: e.source_file, source_text: e.source_text, source_hash: e.source_hash, id: e.id, created: e.created, source: e.source || '导入' };
+        const base = { conclusion: e.conclusion, why: e.why, how: e.how, system: e.system || '', scene: e.scene || '', reuse: e.reuse || '', raw: e.raw, prompt: e.prompt, prompt_present: e.prompt_present, tags: e.tags, type: e.type || '短线', source_file: e.source_file, source_text: e.source_text, source_hash: e.source_hash, id: e.id, created: e.created, source: e.source || '导入' };
         if (e.status) base.status = e.status;
         if (e.match.status === 'changed' || e.match.status === 'same') return { ...base, action: 'update', target_id: e.match.match_id };
         return { ...base, action: 'create' };
@@ -869,11 +880,11 @@ function openImport() {
 function openExport(presetIds) {
   const m = openModal(`
     <h3>导出 Markdown</h3>
-    <div class="sub">按「短线 / 长线」各生成一个文件。格式可以被工作台再次导入，也方便 Agent 读取维护。</div>
+    <div class="sub">按系统生成 Markdown 文件，可以再次导入工作台。</div>
     <div class="row" style="margin:0 0 12px">
       <span style="font-size:13px">范围</span>
       <div class="seg" id="xScope">
-        <button data-s="all" class="on">全部</button><button data-s="短线">只要短线</button><button data-s="长线">只要长线</button>
+        <button data-s="all" class="on">全部</button>
         ${presetIds ? '<button data-s="current">当前列表</button>' : ''}
       </div>
       <label style="font-size:13px;display:flex;gap:6px;align-items:center"><input type="checkbox" id="xInbox" checked> 包含收件箱里未整理的</label>
@@ -940,10 +951,13 @@ function download(name, text) {
 }
 function entryToMd(e) {
   const out = [`## ${e.conclusion || '（待整理）' + String(e.raw || '').split('\n')[0].slice(0, 40)}`, `- id: ${e.id}`, `- 类型: ${e.type}`];
+  if (e.system) out.push(`- 系统: ${e.system}`);
   if (e.tags?.length) out.push(`- 标签: ${e.tags.join('、')}`);
   if (e.source) out.push(`- 来源: ${e.source}`);
   out.push(`- 记录于: ${String(e.created || '').slice(0, 10)}`, '');
-  if (e.why) out.push('### 为什么这样认为', e.why, '');
+  if (e.why) out.push('### 属于哪个系统，为什么', e.why, '');
+  if (e.scene) out.push('### 应用场景', e.scene, '');
+  if (e.reuse) out.push('### 快速复用', e.reuse, '');
   if (e.how) out.push('### 以后怎么做', e.how, '');
   if (e.raw) out.push('### 原始记录', e.raw.split('\n').map((l) => '> ' + l).join('\n'), '');
   if (e.prompt) out.push('### 提示词', e.prompt.split('\n').map((l) => '> ' + l).join('\n'), '');
@@ -1080,7 +1094,8 @@ function bind() {
     if (nd) { const [a, b] = nd.dataset.notdup.split('|'); await api('POST', '/api/not-duplicate', { a, b }); S.notDup.push([a, b].sort()); renderList(); toast('已标记为不重复，不会再提示'); return; }
     const c = ev.target.closest('[data-id]'); if (c) selectEntry(c.dataset.id);
   });
-  $('#detail').addEventListener('click', (ev) => {
+  $('#detail').addEventListener('click', async (ev) => {
+    const copy = ev.target.closest('[data-copy-code]'); if (copy) { try { await navigator.clipboard.writeText(copy.parentElement.querySelector('code').textContent); toast('已复制'); } catch (_) { toast('复制失败，请手动选择文字', true); } return; }
     const a = ev.target.closest('[data-act]'); if (a) { act(a.dataset.act).catch((e) => toast(e.message, true)); return; }
     const g = ev.target.closest('[data-goto]'); if (g) { ev.preventDefault(); const id = g.dataset.goto; const x = byId(id); if (x && !inView(x, S.view)) { S.view = inView(x, 'trash') ? 'trash' : 'all'; renderNav(); renderList(); } selectEntry(id); return; }
     const f = ev.target.closest('[data-fill]'); if (f) { startEdit(S.selectedId, f.dataset.fill); return; }

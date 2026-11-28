@@ -116,7 +116,7 @@ class Store:
         return None
 
 
-EDITABLE = ("type", "status", "conclusion", "why", "how", "raw", "prompt", "tags", "source")
+EDITABLE = ("type", "status", "conclusion", "why", "how", "raw", "prompt", "tags", "source", "system", "scene", "reuse")
 
 
 def new_id():
@@ -133,6 +133,8 @@ def clean_entry_input(d):
                 v = list(dict.fromkeys(v))
             elif k == "type":
                 v = v if v in mdlib.TYPES else "短线"
+            elif k == "system":
+                v = v if v in ("观点", "尝鲜", "干货", "拆解") else ""
             elif k == "status":
                 v = v if v in ("inbox", "active", "trashed", "merged") else "active"
             else:
@@ -165,7 +167,7 @@ def make_entry(d):
 
 
 def snapshot(e):
-    return {k: e.get(k) for k in ("conclusion", "why", "how", "raw", "prompt", "tags", "type", "status")} | {"at": e.get("updated")}
+    return {k: e.get(k) for k in ("conclusion", "why", "how", "raw", "prompt", "tags", "type", "status", "system", "scene", "reuse", "source")} | {"at": e.get("updated")}
 
 
 def update_entry(e, patch, keep_history=True):
@@ -270,6 +272,9 @@ def do_import(store, items):
             cur = store.get(it["target_id"])
             if cur:
                 patch = {k: it[k] for k in ("conclusion", "why", "how", "raw", "tags", "type") if k in it and it[k] not in (None,)}
+                for key in ("system", "scene", "reuse", "source"):
+                    if it.get(key):
+                        patch[key] = it[key]
                 if it.get("prompt_present"):
                     patch["prompt"] = it.get("prompt", "")
                 if update_entry(cur, patch):
@@ -312,6 +317,14 @@ def select_for_export(store, scope, ids=None, include_inbox=True):
 
 def build_markdown_files(store, scope, ids=None, include_inbox=True):
     groups = select_for_export(store, scope, ids, include_inbox)
+    if scope == "all":
+        entries = [entry for group in groups.values() for entry in group]
+        systems = ("观点", "尝鲜", "干货", "拆解", "未分类")
+        categorized = {name: [] for name in systems}
+        for entry in entries:
+            system = entry.get("system")
+            categorized[system if system in systems[:-1] else "未分类"].append(entry)
+        return {f"{name}.md": mdlib.entries_to_markdown(es, name) for name, es in categorized.items() if es}
     return {f"{t}.md": mdlib.entries_to_markdown(es, t) for t, es in groups.items() if es or scope == t}
 
 
