@@ -859,7 +859,7 @@ function openImport() {
     $('#impCancel', m).addEventListener('click', closeModal);
     $('#impGo', m).addEventListener('click', async () => {
       const items = sel.map((e) => {
-        const base = { conclusion: e.conclusion, why: e.why, how: e.how, system: e.system || '', scene: e.scene || '', reuse: e.reuse || '', raw: e.raw, prompt: e.prompt, prompt_present: e.prompt_present, tags: e.tags, type: e.type || '短线', source_file: e.source_file, source_text: e.source_text, source_hash: e.source_hash, id: e.id, created: e.created, source: e.source || '导入' };
+        const base = { conclusion: e.conclusion, why: e.why, how: e.how, system: e.system || '', scene: e.scene || '', reuse: e.reuse || '', raw: e.raw, prompt: e.prompt, prompt_present: e.prompt_present, tags: e.tags, type: e.type || undefined, source_file: e.source_file, source_text: e.source_text, source_hash: e.source_hash, id: e.id, created: e.created, source: e.source || '导入' };
         if (e.status) base.status = e.status;
         if (e.match.status === 'changed' || e.match.status === 'same') return { ...base, action: 'update', target_id: e.match.match_id };
         return { ...base, action: 'create' };

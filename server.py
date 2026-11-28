@@ -271,7 +271,7 @@ def do_import(store, items):
         if action == "update" and it.get("target_id"):
             cur = store.get(it["target_id"])
             if cur:
-                patch = {k: it[k] for k in ("conclusion", "why", "how", "raw", "tags", "type") if k in it and it[k] not in (None,)}
+                patch = {k: it[k] for k in ("conclusion", "why", "how", "raw", "tags", "type") if k in it and it[k] not in (None, "", [])}
                 for key in ("system", "scene", "reuse", "source"):
                     if it.get(key):
                         patch[key] = it[key]
